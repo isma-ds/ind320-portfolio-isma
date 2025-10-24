@@ -35,3 +35,13 @@ var/
 
 # Streamlit
 .streamlit/
+# Ignore everything outside the current project directory
+/*
+!/app.py
+!/README.md
+!/.gitignore
+!/requirements.txt
+!/.devcontainer/
+!/data/
+!/pages/
+!/notebooks/
