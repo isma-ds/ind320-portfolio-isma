@@ -6,6 +6,7 @@ import streamlit as st
 import plotly.express as px
 from sklearn.neighbors import LocalOutlierFactor
 from scipy.fftpack import dct, idct
+from pandas.api.types import is_datetime64_any_dtype
 
 st.set_page_config(page_title="Analysis B — SPC & LOF (Open-Meteo 2021)", page_icon="⚡", layout="wide")
 st.title("⚡ Analysis B — SPC & LOF (Open-Meteo 2021)")
@@ -18,18 +19,34 @@ def load_or_build_era5():
     """
     Returns a DataFrame with columns:
       time (datetime64[ns]), temperature_2m (float), precipitation (float), era5_year (int), city (str)
-    If the CSV isn't present, a small demo 2021 dataset is created and saved.
+    If the CSV isn't present, a small 2021 dataset is created and saved.
     """
     if os.path.exists(DATA_PATH):
-        df = pd.read_csv(DATA_PATH, parse_dates=["time"])
-        # Ensure required columns exist (add precipitation if missing)
+        df = pd.read_csv(DATA_PATH)
+        # Robust time parsing (works with strings or already-datetimes, UTC or naive)
+        if "time" in df.columns:
+            df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
+            # drop tz info to keep numpy/plotly happy
+            try:
+                df["time"] = df["time"].dt.tz_convert(None)
+            except Exception:
+                try:
+                    df["time"] = df["time"].dt.tz_localize(None)
+                except Exception:
+                    pass
+            df = df.dropna(subset=["time"])
+        else:
+            # build an index if somehow missing
+            df["time"] = pd.date_range("2021-01-01", periods=len(df), freq="H")
+
+        # Ensure precipitation exists
         if "precipitation" not in df.columns:
-            # light precipitation with a few spikes
             rng = np.random.default_rng(42)
             base = np.clip(rng.normal(0.3, 0.2, len(df)), 0, None)
             spikes_idx = rng.choice(len(df), size=int(len(df) * 0.01), replace=False)
             base[spikes_idx] += rng.uniform(3, 10, len(spikes_idx))
             df["precipitation"] = base
+
         st.info("✅ ERA5 data loaded from cache (data/open-meteo-subset.csv).")
         return df
 
@@ -39,10 +56,7 @@ def load_or_build_era5():
     n = len(time)
     rng = np.random.default_rng(0)
 
-    # Temperature: seasonal signal + noise
     temp = 5 + 10 * np.sin(2 * np.pi * (time.dayofyear.values / 365.0)) + rng.normal(0, 2, n)
-
-    # Precipitation: mostly small values with occasional heavy hours
     precip = np.clip(rng.normal(0.3, 0.2, n), 0, None)
     spikes_idx = rng.choice(n, size=int(n * 0.01), replace=False)
     precip[spikes_idx] += rng.uniform(3, 10, len(spikes_idx))
@@ -61,40 +75,39 @@ def load_or_build_era5():
 
 df = load_or_build_era5()
 
-# Safety: ensure dtypes
-if not np.issubdtype(df["time"].dtype, np.datetime64):
-    df["time"] = pd.to_datetime(df["time"])
+# Safety: ensure datetime (naive)
+if not is_datetime64_any_dtype(df["time"]):
+    df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
+try:
+    df["time"] = df["time"].dt.tz_convert(None)
+except Exception:
+    try:
+        df["time"] = df["time"].dt.tz_localize(None)
+    except Exception:
+        pass
+df = df.dropna(subset=["time"])
 
-# ---------- Sidebar / controls ----------
+# ---------- Controls ----------
 st.markdown("### Controls")
-
 colA, colB = st.columns(2)
 with colA:
-    cutoff = st.slider(
-        "DCT high-pass cutoff (keep high frequencies ≥ this index)",
-        min_value=2, max_value=120, value=30, step=1
-    )
+    cutoff = st.slider("DCT high-pass cutoff (keep high frequencies ≥ this index)",
+                       min_value=2, max_value=120, value=30, step=1)
 with colB:
-    k_sigma = st.slider(
-        "SPC threshold (k × MAD)",
-        min_value=1.0, max_value=6.0, value=3.0, step=0.1
-    )
+    k_sigma = st.slider("SPC threshold (k × MAD)",
+                        min_value=1.0, max_value=6.0, value=3.0, step=0.1)
+st.caption("SPC outliers are computed on **temperature** using a DCT high-pass + MAD bounds.")
 
-st.caption("SPC outliers are found on **temperature** using a DCT high-pass + MAD bounds.")
-
-# ---------- SPC on temperature via DCT high-pass ----------
+# ---------- SPC on temperature ----------
 y = df["temperature_2m"].to_numpy()
-# DCT (type-II), zero low-freq, inverse DCT to get seasonally adjusted temp variation
 Y = dct(y, type=2, norm="ortho")
 cut = np.clip(cutoff, 0, len(Y) - 1)
 Y[:cut] = 0.0
 satv = idct(Y, type=2, norm="ortho")
 
-# Robust MAD sigma
 med = np.median(satv)
 mad = np.median(np.abs(satv - med))
 sigma = 1.4826 * mad if mad > 0 else np.std(satv)
-
 upper = k_sigma * sigma
 lower = -k_sigma * sigma
 is_out = (satv > upper) | (satv < lower)
@@ -108,41 +121,23 @@ df_spc = pd.DataFrame({
     "is_outlier": np.where(is_out, "True", "False")
 })
 
-# Plot temperature with SPC bounds + outliers
 fig_spc = px.scatter(
-    df_spc,
-    x="time",
-    y="temperature_2m",
-    color="is_outlier",
+    df_spc, x="time", y="temperature_2m", color="is_outlier",
     color_discrete_map={"False": "#aaaaaa", "True": "red"},
     title=f"Temperature with SPC outliers (k={k_sigma:.1f}, cutoff={cutoff})",
 )
-# Add bounds as lines
-bounds_df = pd.DataFrame({
-    "time": df["time"],
-    "SPC lower": lower,
-    "SPC upper": upper
-})
-fig_spc.add_traces(
-    px.line(bounds_df, x="time", y="SPC lower").data
-)
-fig_spc.add_traces(
-    px.line(bounds_df, x="time", y="SPC upper").data
-)
+bounds_df = pd.DataFrame({"time": df["time"], "SPC lower": lower, "SPC upper": upper})
+fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC lower").data)
+fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC upper").data)
 fig_spc.update_layout(legend_title="Outlier")
-
 st.plotly_chart(fig_spc, use_container_width=True)
-st.markdown(
-    f"**Outliers:** {is_out.sum()} / {len(df_spc)} "
-    f"({100.0 * is_out.sum() / len(df_spc):.2f}%).  "
-    f"**MAD:** {mad:.3f}"
-)
+st.markdown(f"**Outliers:** {is_out.sum()} / {len(df_spc)} "
+            f"({100.0 * is_out.sum() / len(df_spc):.2f}%).  **MAD:** {mad:.3f}")
 
 st.markdown("---")
 
-# ---------- LOF anomalies on precipitation ----------
+# ---------- LOF on precipitation ----------
 st.subheader("LOF anomalies — precipitation")
-
 col1, col2 = st.columns(2)
 with col1:
     lof_frac = st.slider("Proportion of outliers (contamination)", 0.01, 0.10, 0.01, step=0.01)
@@ -167,8 +162,5 @@ fig_lof = px.scatter(
     title=f"Precipitation anomalies by LOF (contamination={lof_frac:.2f}, k={n_neighbors})"
 )
 st.plotly_chart(fig_lof, use_container_width=True)
-
-st.markdown(
-    f"**Anomalies:** {is_anom.sum()} / {len(df_lof)} "
-    f"({100.0 * is_anom.sum() / len(df_lof):.2f}%)."
-)
+st.markdown(f"**Anomalies:** {is_anom.sum()} / {len(df_lof)} "
+            f"({100.0 * is_anom.sum() / len(df_lof):.2f}%).")
