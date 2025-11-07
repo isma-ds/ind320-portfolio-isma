@@ -1,149 +1,159 @@
 # notebooks/utils_analysis.py
 import numpy as np
 import pandas as pd
-import plotly.express as px
-from pathlib import Path
-from statsmodels.tsa.seasonal import STL
 import plotly.graph_objects as go
+from statsmodels.tsa.seasonal import STL
 
-# ---------- Robust production CSV loader ----------
-def load_production_csv(path: str | Path = "data/production_per_group_mba_hour.csv") -> pd.DataFrame:
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Production CSV not found at {p.resolve()}")
-
-    df = pd.read_csv(p)
-
-    # Normalize header names (trim & unify case)
-    df.columns = df.columns.str.strip()
-
-    # Common header variants → standard names
-    rename_map = {}
-    for c in df.columns:
-        lc = c.lower()
-        if lc == "pricearea":        rename_map[c] = "priceArea"
-        elif lc == "productiongroup":rename_map[c] = "productionGroup"
-        elif lc in ("starttime", "start_time"): rename_map[c] = "startTime"
-        elif lc in ("quantitykwh", "quantity_kwh", "quantity", "kwh"): rename_map[c] = "quantityKwh"
-    if rename_map:
-        df = df.rename(columns=rename_map)
-
-    required = {"priceArea", "productionGroup", "startTime", "quantityKwh"}
-    missing = required.difference(df.columns)
-    if missing:
-        raise KeyError(f"Production CSV missing columns: {sorted(missing)} — columns present: {list(df.columns)}")
-
-    # Parse time, force UTC and hour frequency later
-    df["startTime"] = pd.to_datetime(df["startTime"], utc=True, errors="coerce")
-    df = df.dropna(subset=["startTime"])
-    # Ensure numeric
-    df["quantityKwh"] = pd.to_numeric(df["quantityKwh"], errors="coerce").fillna(0)
-
-    return df
-
-
-# ---------- Internal series builder (safe) ----------
+# ---------- helpers ----------
 def _series(df: pd.DataFrame, area: str, group: str) -> pd.Series:
-    if df.empty:
-        raise ValueError("Production dataframe is empty.")
-
-    # Filter
-    part = df[(df["priceArea"] == area) & (df["productionGroup"] == group)].copy()
-    if part.empty:
-        # Help message that shows what combinations exist
-        have = (
-            df.groupby(["priceArea", "productionGroup"])["quantityKwh"]
-            .size().reset_index().rename(columns={"quantityKwh":"n"})
-        )
-        raise ValueError(
-            f"No rows for (area={area}, group={group}). "
-            f"Available combos:\n{have.head(20).to_string(index=False)}"
-        )
-
-    # Sort, select and hourly index
-    part = part.sort_values("startTime")[["startTime", "quantityKwh"]]
     ts = (
-        part.set_index("startTime")["quantityKwh"]
+        df[(df["priceArea"] == area) & (df["productionGroup"] == group)]
+        .sort_values("startTime")[["startTime", "quantitykWh"]]
+        .set_index("startTime")["quantitykWh"]
         .asfreq("H")
         .interpolate(limit_direction="both")
     )
     return ts
 
+def _ensure_stl_params(ts_len: int, period: int, seasonal: int, trend: int):
+    # period must be >= 2 and <= ts_len//2 roughly; trend must be odd >=3 and > period; seasonal >= 7 typically
+    if period < 2:
+        period = 2
+    max_period = max(2, ts_len // 3)
+    if period > max_period:
+        period = max_period
 
-# ---------- STL (auto-safe) ----------
+    trend = int(trend)
+    if trend <= period:
+        trend = period + 1
+    if trend % 2 == 0:
+        trend += 1
+    if trend < 3:
+        trend = 3
+
+    seasonal = int(seasonal)
+    if seasonal < 7:
+        seasonal = 7
+    return period, seasonal, trend
+
+# ---------- STL ----------
 def stl_production_plot(
     df: pd.DataFrame,
-    area: str = "NO5",
-    group: str = "Hydro",
-    period_hours: int = 24 * 7,
+    area: str,
+    group: str,
+    period: int = 24 * 7,   # 1 week
     seasonal: int = 13,
     trend: int = 31,
     robust: bool = True,
-    title: str = "STL — Production"
 ):
     ts = _series(df, area, group)
+    if ts.empty:
+        return go.Figure(), False, f"No rows for (area={area}, group={group})."
 
-    # If the series is short, adjust period/trend safely
-    valid_len = int(ts.dropna().shape[0])
-    if valid_len < 10:
-        raise ValueError(f"Series too short for STL (len={valid_len}).")
+    period, seasonal, trend = _ensure_stl_params(len(ts.dropna()), period, seasonal, trend)
 
-    # Period must be >= 2 and <= len/2 to make sense
-    period = max(2, min(period_hours, valid_len // 2))
-    # Trend must be odd, ≥3 and > period
-    trend_adj = int(trend)
-    if trend_adj <= period:
-        trend_adj = period + 1
-    if trend_adj % 2 == 0:
-        trend_adj += 1
-    if trend_adj < 3:
-        trend_adj = 3
-    seasonal_adj = int(seasonal)
-
-    res = STL(ts, period=period, seasonal=seasonal_adj, trend=trend_adj, robust=bool(robust)).fit()
-
+    res = STL(ts, period=period, seasonal=seasonal, trend=trend, robust=robust).fit()
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=ts.index, y=ts.values, name="observed", mode="lines"))
-    fig.add_trace(go.Scatter(x=ts.index, y=res.trend, name="trend", mode="lines"))
-    fig.add_trace(go.Scatter(x=ts.index, y=res.seasonal, name="seasonal", mode="lines"))
-    fig.add_trace(go.Scatter(x=ts.index, y=res.resid, name="resid", mode="lines"))
+    fig.add_trace(go.Scatter(x=ts.index, y=ts.values, name="Observed", mode="lines"))
+    fig.add_trace(go.Scatter(x=ts.index, y=res.trend, name="Trend", mode="lines"))
+    fig.add_trace(go.Scatter(x=ts.index, y=res.seasonal, name="Seasonal", mode="lines"))
+    fig.add_trace(go.Scatter(x=ts.index, y=res.resid, name="Resid", mode="lines"))
     fig.update_layout(
-        title=f"{title} — {area}/{group} (period={period}, trend={trend_adj}, seasonal={seasonal_adj})",
-        height=520, margin=dict(l=10, r=10, t=60, b=10)
+        title=f"STL — {area}/{group} (period={period}, trend={trend}, seasonal={seasonal})",
+        xaxis_title="time", yaxis_title="quantity kWh", legend=dict(orientation="h"),
+        height=420
     )
-    return fig
+    return fig, True, ""
 
-
-# ---------- Spectrogram (unchanged API) ----------
+# ---------- Spectrogram ----------
 def spectrogram_production_plot(
     df: pd.DataFrame,
-    area: str = "NO5",
-    group: str = "Hydro",
+    area: str,
+    group: str,
     window_len: int = 24 * 7,
     overlap: float = 0.5,
-    title: str = "Spectrogram — Production",
+    polar: bool = False,
 ):
-    ts = _series(df, area, group).astype(float)
+    """
+    Lightweight spectrogram (NumPy only).
+    - Split series into overlapping windows
+    - FFT per window -> magnitude
+    - Stack magnitudes into (freq x time-window) matrix
+    """
+    x = _series(df, area, group)
+    if x.empty:
+        return go.Figure(), False, f"No rows for (area={area}, group={group})."
 
-    # Build windowed short-time energy (simple demo spectrogram)
-    step = max(1, int(window_len * (1 - overlap)))
-    frames = []
-    times = []
-    vals = ts.values
-    for start in range(0, len(vals) - window_len + 1, step):
-        seg = vals[start : start + window_len]
-        frames.append(np.abs(np.fft.rfft(seg)))
-        times.append(ts.index[start + window_len // 2])
-    if not frames:
-        raise ValueError("Series too short for chosen window/overlap.")
+    x = x.values.astype(float)
+    N = len(x)
+    w = int(window_len)
+    if w < 32:
+        w = 32
+    step = max(1, int(w * (1 - overlap)))
+    if step < 1: step = 1
+    if N < w:
+        return go.Figure(), False, "Series too short for selected window."
 
-    Z = np.vstack(frames).T  # freq x time
-    fig = px.imshow(
-        Z,
-        origin="lower",
-        aspect="auto",
-        labels=dict(x="window index", y="frequency bin", color="amplitude"),
-        title=f"{title} — {area}/{group} (win={window_len}, overlap={overlap})",
+    # Hanning window
+    win = np.hanning(w)
+
+    # sliding windows
+    starts = np.arange(0, N - w + 1, step)
+    if len(starts) < 2:
+        return go.Figure(), False, "Too few windows; increase overlap or reduce window length."
+
+    spec_list = []
+    for s in starts:
+        seg = x[s:s+w] * win
+        fft = np.fft.rfft(seg)                     # positive freqs
+        mag = np.abs(fft)                          # magnitude
+        spec_list.append(mag)
+
+    S = np.stack(spec_list, axis=1)                # (freq_bins, windows)
+    freqs = np.fft.rfftfreq(w, d=3600)            # Hz with 1h step (3600s) -> use index instead
+    # convert to cycles/day for readability
+    cycles_per_day = freqs * 3600 * 24
+
+    if polar:
+        # collapse spectrogram across time: average power by frequency -> polar "circle"
+        power = S.mean(axis=1)
+        fig = go.Figure()
+        fig.add_trace(go.Barpolar(theta=cycles_per_day, r=power, name="avg power"))
+        fig.update_layout(
+            title=f"Polar periodogram — {area}/{group} (avg over windows)",
+            polar=dict(radialaxis=dict(showline=False)),
+            height=420
+        )
+        return fig, True, ""
+    else:
+        # heatmap spectrogram
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=20*np.log10(S + 1e-9),   # dB scale
+                x=np.arange(S.shape[1]),
+                y=cycles_per_day,
+                coloraxis="coloraxis"
+            )
+        )
+        fig.update_layout(
+            title=f"Spectrogram — {area}/{group}  (window={w}h, overlap={overlap:.2f})",
+            xaxis_title="window index",
+            yaxis_title="cycles/day",
+            coloraxis=dict(colorscale="Turbo"),
+            height=420
+        )
+        return fig, True, ""
+
+# ---------- availability map ----------
+def combos_available(df: pd.DataFrame):
+    c = (
+        df.groupby(["priceArea", "productionGroup"])["quantitykWh"]
+        .size()
+        .reset_index(name="n")
+        .sort_values(["priceArea", "productionGroup"])
     )
-    fig.update_layout(height=520, margin=dict(l=10, r=10, t=60, b=10))
-    return fig
+    # {'NO1': ['Thermal'], 'NO5': ['Hydro','Wind'], ...}
+    d = {}
+    for r in c.itertuples(index=False):
+        d.setdefault(r.priceArea, []).append(r.productionGroup)
+    return d, c

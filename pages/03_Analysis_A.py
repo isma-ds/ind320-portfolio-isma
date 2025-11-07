@@ -2,67 +2,74 @@
 import streamlit as st
 import pandas as pd
 from notebooks.utils_analysis import (
-    load_production_csv,
-    stl_production_plot,
-    spectrogram_production_plot,
+    stl_production_plot, spectrogram_production_plot, combos_available
 )
 
-st.set_page_config(page_title="Analysis A — STL & Spectrogram", layout="wide")
-
+st.set_page_config(page_title="Analysis A — STL & Spectrogram", page_icon="⚡", layout="wide")
 st.title("⚡ Analysis A — STL & Spectrogram (Elhub production)")
 
-# --- Shared controls (area + group) ---
-with st.container():
-    st.subheader("Price area")
-    col_area = st.columns(5)
-    areas = ["NO1", "NO2", "NO3", "NO4", "NO5"]
-    # Default to session state from PriceArea (if any), else NO5
-    default_area = st.session_state.get("ind320_area", "NO5")
-    area_index = areas.index(default_area) if default_area in areas else 4
-    area = st.radio(" ", areas, index=area_index, horizontal=True, label_visibility="collapsed")
+# -------- data (CSV fallback) --------
+@st.cache_data
+def load_prod():
+    path = "data/production_per_group_mba_hour.csv"
+    df = pd.read_csv(path, parse_dates=["startTime"])
+    return df
 
-grp = st.selectbox("Production group", ["Hydro", "Wind", "Thermal"], index=0)
+prod = load_prod()
+avail_map, avail_table = combos_available(prod)
 
-# --- Load CSV robustly (local packaged CSV from A2 fallback) ---
-@st.cache_data(show_spinner=False)
-def _load_prod():
-    return load_production_csv("data/production_per_group_mba_hour.csv")
+# -------- UI --------
+st.subheader("Price area")
+areas = ["NO1", "NO2", "NO3", "NO4", "NO5"]
+area = st.radio("", areas, index=areas.index("NO5"), horizontal=True)
 
-try:
-    prod = _load_prod()
-except Exception as e:
-    st.error(f"Could not load production CSV: {e}")
+valid_groups = avail_map.get(area, [])
+if not valid_groups:
+    st.warning(f"No production groups available for {area} in your CSV.")
+    st.dataframe(avail_table, use_container_width=True)
     st.stop()
 
-# --- Tabs ---
-tab1, tab2 = st.tabs(["STL decomposition", "Spectrogram"])
+st.subheader("Production group")
+group = st.selectbox("", valid_groups, index=0, key="a3_group")
 
-with tab1:
-    c1, c2, c3, c4 = st.columns([1,1,1,1])
-    period = c1.number_input("STL period (hours)", min_value=4, max_value=24*60, step=4, value=24*7)
-    seasonal = c2.slider("Seasonal smoother", 7, 61, 13, step=2)
-    trend = c3.slider("Trend smoother", 7, 121, 31, step=2)
-    robust = c4.checkbox("Robust", value=True)
+tabs = st.tabs(["STL decomposition", "Spectrogram"])
 
-    try:
-        fig = stl_production_plot(
-            prod, area=area, group=grp,
-            period_hours=int(period), seasonal=int(seasonal), trend=int(trend),
-            robust=bool(robust),
-            title="STL Decomposition — Production"
-        )
+with tabs[0]:
+    c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.2, 0.8])
+    with c1:
+        period = st.number_input("STL period (hours)", value=24*7, min_value=24, step=24)
+    with c2:
+        seasonal = st.slider("Seasonal smoother", 7, 61, 13, step=2)
+    with c3:
+        trend = st.slider("Trend smoother", 7, 121, 31, step=2)
+    with c4:
+        robust = st.checkbox("Robust", value=True)
+
+    fig, ok, msg = stl_production_plot(
+        prod, area=area, group=group,
+        period=period, seasonal=seasonal, trend=trend, robust=robust
+    )
+    if ok:
         st.plotly_chart(fig, use_container_width=True)
-    except Exception as e:
-        st.error(str(e))
+    else:
+        st.error(msg)
+        st.dataframe(avail_table, use_container_width=True)
 
-with tab2:
-    c1, c2 = st.columns(2)
-    win = c1.slider("Window length (hours)", 24, 24*28, 24*7, step=24)
-    ov  = c2.slider("Window overlap", 0.0, 0.9, 0.5, step=0.1)
-    try:
-        fig2 = spectrogram_production_plot(
-            prod, area=area, group=grp, window_len=int(win), overlap=float(ov)
-        )
-        st.plotly_chart(fig2, use_container_width=True)
-    except Exception as e:
-        st.error(str(e))
+with tabs[1]:
+    c1, c2, c3 = st.columns([1.2, 1.2, 0.8])
+    with c1:
+        window_len = st.number_input("Window length (hours)", value=24*7, min_value=32, step=24)
+    with c2:
+        overlap = st.slider("Window overlap", 0.0, 0.9, 0.5, step=0.05)
+    with c3:
+        polar = st.checkbox("Polar view (circle)", value=False)
+
+    fig, ok, msg = spectrogram_production_plot(
+        prod, area=area, group=group,
+        window_len=int(window_len), overlap=float(overlap), polar=polar
+    )
+    if ok:
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.error(msg)
+        st.dataframe(avail_table, use_container_width=True)
