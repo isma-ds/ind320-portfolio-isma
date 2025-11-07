@@ -1,0 +1,28 @@
+# --- Python cache and build files ---
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.egg-info/
+.ipynb_checkpoints/
+
+# --- Editors and OS ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+.env
+
+# --- Streamlit secrets (keep private) ---
+.streamlit/secrets.toml
+
+# --- Data (optional local storage) ---
+# data/*.json
+# data/*.parquet
+
+# ✅ Do NOT ignore your app code
+# (No wildcard like "*" here!)

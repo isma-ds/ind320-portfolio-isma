@@ -1,0 +1,76 @@
+import streamlit as st
+from pathlib import Path
+import pandas as pd
+from lib.open_meteo import fetch_era5
+from notebooks.utils_analysis import stl_production_plot, spectrogram_production_plot
+
+st.set_page_config(
+    page_title="IND320 Assignment 3 — Isma Sohail",
+    page_icon="🌦️",
+    layout="wide"
+)
+
+st.sidebar.title("Navigation")
+st.sidebar.markdown("### 📊 IND320 — Assignment 3")
+page = st.sidebar.radio("Select Page:", [
+    "🏠 Home",
+    "📍 Price Area Selector",
+    "📈 Weather Analysis (STL + Spectrogram)",
+    "⚡ Production Anomalies (SPC + LOF)"
+])
+
+# --- HOME ---
+if page == "🏠 Home":
+    st.title("🌦️ IND320 Assignment 3 — Weather & Energy Analysis")
+    st.write("This Streamlit app integrates Open-Meteo ERA5 data with Elhub-style production datasets.")
+    st.markdown("**Student:** Isma Sohail  \n**Course:** IND320 — NMBU")
+
+# --- PRICE AREA SELECTOR ---
+elif page == "📍 Price Area Selector":
+    st.title("📍 Select Electricity Price Area")
+
+    cities = pd.DataFrame({
+        "priceArea": ["NO1", "NO2", "NO3", "NO4", "NO5"],
+        "city": ["Oslo", "Kristiansand", "Trondheim", "Tromsø", "Bergen"],
+        "lat": [59.9139, 58.1467, 63.4305, 69.6492, 60.3929],
+        "lon": [10.7522, 7.9956, 10.3951, 18.9553, 5.3241]
+    })
+
+    st.dataframe(cities)
+    selected_city = st.selectbox("Choose a city:", cities["city"])
+    st.session_state["city"] = selected_city
+    st.success(f"✅ Selected {selected_city}")
+
+# --- WEATHER ANALYSIS ---
+elif page == "📈 Weather Analysis (STL + Spectrogram)":
+    st.title("📈 Weather Analysis (STL + Spectrogram)")
+    city = st.session_state.get("city", "Bergen")
+    st.write(f"Using {city} for 2021 (ERA5 reanalysis)")
+
+    st.markdown("### ⛅ Fetching data from Open-Meteo API...")
+    try:
+        cities = {
+            "Bergen": (60.3929, 5.3241),
+            "Oslo": (59.9139, 10.7522),
+            "Trondheim": (63.4305, 10.3951)
+        }
+        lat, lon = cities.get(city, (60.3929, 5.3241))
+        df = fetch_era5(lat, lon, 2021)
+        st.write(df.head())
+    except Exception as e:
+        st.error(f"Failed to fetch ERA5: {e}")
+
+    st.markdown("### 🔹 STL Decomposition (Production)")
+    prod = pd.read_csv("data/production_per_group_mba_hour.csv")
+    fig = stl_production_plot(prod, area="NO5", group="Hydro")
+    st.pyplot(fig)
+
+    st.markdown("### 🔹 Spectrogram (Production)")
+    fig2 = spectrogram_production_plot(prod, area="NO5", group="Hydro")
+    st.pyplot(fig2)
+
+# --- ANOMALIES PAGE ---
+elif page == "⚡ Production Anomalies (SPC + LOF)":
+    st.title("⚡ Outlier & Anomaly Detection")
+    st.markdown("Includes DCT-based SPC analysis for temperature and LOF-based precipitation anomaly detection.")
+    st.markdown("👉 Implemented in Jupyter Notebook (`IND320_Assignment3.ipynb`) for reproducibility.")
