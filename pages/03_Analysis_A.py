@@ -1,28 +1,67 @@
 import streamlit as st
 import pandas as pd
-from notebooks.utils_analysis import stl_production_plot, spectrogram_production_plot
+from pathlib import Path
 
-st.set_page_config(page_title="Analysis A", page_icon="📈", layout="wide")
-st.title("📈 Analysis A — STL & Spectrogram")
+# Robust import: works both locally and on Streamlit Cloud
+try:
+    from notebooks.utils_analysis import stl_production_plot, spectrogram_production_plot
+except ModuleNotFoundError:
+    from utils_analysis import stl_production_plot, spectrogram_production_plot
 
-area = st.session_state.get("ind320_area", "NO5")
-prod = pd.read_csv("data/production_per_group_mba_hour.csv", parse_dates=["startTime"])
-groups = sorted(prod["productionGroup"].unique())
+st.set_page_config(page_title="Analysis A — STL & Spectrogram", layout="wide")
 
-tab1, tab2 = st.tabs(["STL decomposition", "Spectrogram"])
+DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "production_per_group_mba_hour.csv"
 
-with tab1:
-    g = st.selectbox("Production group", groups, index=0)
-    period = st.number_input("STL period (hours)", min_value=24, max_value=24*21, value=24*7, step=24)
-    seasonal = st.slider("Seasonal smoother", 7, 61, 13, step=2)
-    trend = st.slider("Trend smoother", 7, 121, 31, step=2)
-    robust = st.checkbox("Robust", True)
-    fig = stl_production_plot(prod, area=area, group=g, period=period, seasonal=seasonal, trend=trend, robust=robust)
-    st.pyplot(fig, use_container_width=True)
+@st.cache_data
+def load_prod(path: Path):
+    df = pd.read_csv(path)
+    # Expected columns: priceArea, productionGroup, startTime, quantitykWh
+    df["startTime"] = pd.to_datetime(df["startTime"], utc=True, errors="coerce")
+    return df.dropna(subset=["startTime"])
 
-with tab2:
-    g2 = st.selectbox("Production group (spectrogram)", groups, index=0, key="specg")
-    window = st.slider("Window length (hours)", 24*3, 24*28, 24*7, step=24)
-    overlap = st.slider("Window overlap", 0.0, 0.9, 0.5, step=0.1)
-    fig2 = spectrogram_production_plot(prod, area=area, group=g2, window_len=window, overlap=overlap)
-    st.pyplot(fig2, use_container_width=True)
+df = load_prod(DATA_PATH)
+
+st.title("⚡ Analysis A — STL & Spectrogram (Elhub production)")
+
+# Use global selector from page 02 if available, else default NO5
+area_default = st.session_state.get("ind320_area", "NO5")
+AREAS = ["NO1", "NO2", "NO3", "NO4", "NO5"]
+area = st.radio("Price area", AREAS, index=AREAS.index(area_default), horizontal=True)
+
+groups = sorted(df["productionGroup"].unique().tolist())
+group = st.selectbox("Production group", groups, index=0)
+
+tab_stl, tab_spec = st.tabs(["STL decomposition", "Spectrogram"])
+
+with tab_stl:
+    cols = st.columns([1,1,1,1,1])
+    period = cols[0].number_input("STL period (hours)", min_value=24, max_value=24*60, value=24*7, step=24)
+    seasonal = cols[1].slider("Seasonal smoother", 7, 121, 13, 2)
+    trend = cols[2].slider("Trend smoother", 7, 121, 31, 2)
+    robust = cols[3].checkbox("Robust", True)
+    cols[4].markdown("")  # spacer
+
+    fig = stl_production_plot(
+        df,
+        area=area,
+        group=group,
+        period=int(period),
+        seasonal=int(seasonal),
+        trend=int(trend),
+        robust=bool(robust),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+with tab_spec:
+    cols = st.columns([1,1,1])
+    window_len = cols[0].number_input("Window length (hours)", min_value=24, max_value=24*30, value=24*7, step=24)
+    overlap = cols[1].slider("Window overlap", 0.0, 0.9, 0.5, 0.05)
+
+    fig2 = spectrogram_production_plot(
+        df,
+        area=area,
+        group=group,
+        window_len=int(window_len),
+        overlap=float(overlap),
+    )
+    st.plotly_chart(fig2, use_container_width=True)
