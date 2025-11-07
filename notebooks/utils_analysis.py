@@ -1,39 +1,73 @@
-import numpy as np
+# notebooks/utils_analysis.py
 import pandas as pd
-import matplotlib.pyplot as plt
+import numpy as np
+import plotly.express as px
 from statsmodels.tsa.seasonal import STL
-from scipy.signal import spectrogram
 
-def _series(df, area, group):
-    ts = (df[(df["priceArea"]==area) & (df["productionGroup"]==group)]
-          .sort_values("startTime")[["startTime","quantityKwh"]]
-          .set_index("startTime")["quantityKwh"]
-          .asfreq("H").interpolate(limit_direction="both"))
+# --------------------------------------------------------------------
+# Utility: normalize Elhub column names
+# --------------------------------------------------------------------
+def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    rename_map = {
+        "StartTime": "startTime",
+        "start_time": "startTime",
+        "quantity": "quantitykWh",
+        "Quantity": "quantitykWh",
+        "quantity_kwh": "quantitykWh",
+        "QuantityKWh": "quantitykWh",
+    }
+    df = df.rename(columns={c: rename_map.get(c, c) for c in df.columns})
+    return df
+
+
+# --------------------------------------------------------------------
+# Helper: extract series for area & group safely
+# --------------------------------------------------------------------
+def _series(df: pd.DataFrame, area: str, group: str):
+    df = normalize_columns(df)
+    required = {"priceArea", "productionGroup", "startTime", "quantitykWh"}
+    if not required.issubset(df.columns):
+        missing = required - set(df.columns)
+        raise KeyError(f"Missing columns in dataframe: {missing}")
+
+    ts = (
+        df[(df["priceArea"] == area) & (df["productionGroup"] == group)]
+        .sort_values("startTime")[["startTime", "quantitykWh"]]
+        .dropna()
+    )
     return ts
 
-def stl_production_plot(df, area="NO5", group="Hydro",
-                        period=24*7, seasonal=13, trend=31, robust=True):
-    ts = _series(df, area, group)
-    n = len(ts.dropna())
-    if n < period*2:
-        period = max(5, n//5)
-    if trend <= period:
-        trend = period + 1
-    if trend % 2 == 0:
-        trend += 1
-    res = STL(ts, period=period, seasonal=seasonal, trend=trend, robust=robust).fit()
-    fig = res.plot()
-    fig.suptitle(f"STL — {area}/{group}  (period={period}, trend={trend}, seasonal={seasonal})", y=1.03)
-    fig.tight_layout()
-    return fig
 
-def spectrogram_production_plot(df, area="NO5", group="Hydro",
-                                window_len=24*7, overlap=0.5):
+# --------------------------------------------------------------------
+# STL decomposition plot
+# --------------------------------------------------------------------
+def stl_production_plot(df, area="NO5", group="Hydro",
+                        period=24 * 7, seasonal=13, trend=31, robust=True):
+    df = normalize_columns(df)
     ts = _series(df, area, group)
-    f, t, Sxx = spectrogram(ts.values, nperseg=window_len, noverlap=int(window_len*overlap))
-    fig, ax = plt.subplots(figsize=(8,4))
-    ax.pcolormesh(t, f, 10*np.log10(Sxx+1e-9), shading="gouraud")
-    ax.set_title(f"Spectrogram — {area}/{group} (window={window_len}, overlap={overlap})")
-    ax.set_xlabel("Window index"); ax.set_ylabel("Frequency (arb.)")
-    fig.tight_layout()
+    if ts.empty:
+        raise ValueError(f"No data for area={area}, group={group}")
+
+    ts = ts.set_index("startTime")
+    res = STL(ts["quantitykWh"], period=period, seasonal=seasonal,
+              trend=trend, robust=robust).fit()
+
+    decomp = pd.DataFrame({
+        "time": ts.index,
+        "Observed": res.observed,
+        "Trend": res.trend,
+        "Seasonal": res.seasonal,
+        "Residual": res.resid
+    })
+
+    fig = px.line(
+        decomp.melt(id_vars="time", var_name="Component", value_name="kWh"),
+        x="time", y="kWh", color="Component",
+        title=f"STL Decomposition — {area} / {group}"
+    )
+    fig.update_layout(
+        plot_bgcolor="#0E1117", paper_bgcolor="#0E1117",
+        font=dict(color="white"), legend_title="Component",
+        hovermode="x unified", margin=dict(l=40, r=20, t=60, b=40),
+    )
     return fig
