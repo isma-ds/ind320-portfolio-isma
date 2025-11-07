@@ -12,20 +12,25 @@ st.title("⚡ Analysis A — STL & Spectrogram (Elhub production)")
 @st.cache_data
 def load_prod():
     path = "data/production_per_group_mba_hour.csv"
-    df = pd.read_csv(path, parse_dates=["startTime"])
+    # read raw (no parse) then coerce later, because column names may vary
+    df = pd.read_csv(path)
     return df
 
 prod = load_prod()
+
+# Build availability (robust to column names)
 avail_map, avail_table = combos_available(prod)
 
 # -------- UI --------
 st.subheader("Price area")
 areas = ["NO1", "NO2", "NO3", "NO4", "NO5"]
-area = st.radio("", areas, index=areas.index("NO5"), horizontal=True)
+# default to NO5 if present
+default_idx = areas.index("NO5") if "NO5" in areas else 0
+area = st.radio("", areas, index=default_idx, horizontal=True)
 
 valid_groups = avail_map.get(area, [])
 if not valid_groups:
-    st.warning(f"No production groups available for {area} in your CSV.")
+    st.warning(f"No production groups available for {area} in your CSV. Available combos shown below.")
     st.dataframe(avail_table, use_container_width=True)
     st.stop()
 
@@ -47,7 +52,7 @@ with tabs[0]:
 
     fig, ok, msg = stl_production_plot(
         prod, area=area, group=group,
-        period=period, seasonal=seasonal, trend=trend, robust=robust
+        period=int(period), seasonal=int(seasonal), trend=int(trend), robust=bool(robust)
     )
     if ok:
         st.plotly_chart(fig, use_container_width=True)
@@ -66,7 +71,7 @@ with tabs[1]:
 
     fig, ok, msg = spectrogram_production_plot(
         prod, area=area, group=group,
-        window_len=int(window_len), overlap=float(overlap), polar=polar
+        window_len=int(window_len), overlap=float(overlap), polar=bool(polar)
     )
     if ok:
         st.plotly_chart(fig, use_container_width=True)
