@@ -1,10 +1,24 @@
+# IND320 Assessment 4 - Python Dependencies
+
+# Core
 streamlit>=1.39
 pandas>=2.2
 numpy>=1.26
+
+# Visualization
 plotly>=5.23
+matplotlib>=3.8
+
+# Data Analysis and Forecasting
 scikit-learn>=1.5
 statsmodels>=0.14
 scipy>=1.11
+
+# Database
+pymongo>=4.5
+
+# API and Web
 requests>=2.32
-matplotlib>=3.8
-pymongo
+
+# Optional (for deployment)
+python-dotenv>=1.0
