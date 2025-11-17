@@ -16,6 +16,7 @@ scipy>=1.11
 
 # Database
 pymongo>=4.5
+cassandra-driver>=3.29
 
 # API and Web
 requests>=2.32

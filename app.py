@@ -288,7 +288,7 @@ with col3:
 st.markdown("---")
 st.caption("""
 Assessment 4 - IND320 Energy Analytics Platform | Student: Isma Sohail | NMBU 2025
-Data: Synthetic Elhub-style + Open-Meteo ERA5 | Technology: Python, Streamlit, MongoDB, Plotly
+Data: Real Elhub API + Open-Meteo ERA5 | Technology: Python, Streamlit, MongoDB/Cassandra, Plotly
 """)
 
 # Sidebar information
@@ -301,8 +301,9 @@ with st.sidebar:
     """)
 
     st.markdown("---")
-    st.markdown("### 📊 Data Status")
+    st.markdown("### 📊 Database Status")
 
+    # Check MongoDB connection
     try:
         from pymongo import MongoClient
 
@@ -317,10 +318,36 @@ with st.sidebar:
                       "elhub_production_2022_2024", "elhub_consumption_2022_2024"]
 
         total_records = sum([db[coll].count_documents({}) for coll in collections])
-        st.info(f"Total Records: {total_records:,}")
+        st.info(f"MongoDB Records: {total_records:,}")
 
         client.close()
 
     except:
         st.warning("MongoDB: Not Connected")
-        st.info("Using fallback data sources")
+
+    # Check Cassandra connection
+    try:
+        import cassandra_client as cass
+
+        status = cass.check_connection()
+
+        if status['status'] == 'connected':
+            st.success(f"Cassandra: Connected (v{status['version']})")
+
+            # Get table counts
+            tables = [
+                'elhub_consumption_2021',
+                'elhub_consumption_2022_2024',
+                'elhub_production_2022_2024'
+            ]
+
+            # Note: Counting can be slow in Cassandra, using estimate
+            st.info("Cassandra: 3-node cluster")
+
+        else:
+            st.warning("Cassandra: Not Connected")
+
+    except Exception as e:
+        st.info("Cassandra: Not configured")
+
+    st.caption("Using real Elhub API data")

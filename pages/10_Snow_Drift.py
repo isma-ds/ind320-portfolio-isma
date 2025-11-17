@@ -59,43 +59,122 @@ def fetch_weather_data(lat, lon, start_year, end_year):
         return None
 
 
-def calculate_snow_drift(df):
+def compute_Qupot(hourly_wind_speeds, dt=3600):
     """
-    Calculate snow drift based on meteorological parameters
+    Compute the potential wind-driven snow transport (Qupot) [kg/m]
+    by summing hourly contributions using u^3.8.
 
-    Snow drift formula (simplified):
-    drift = snowfall * wind_factor * temperature_factor
+    Formula from Tabler (2003):
+       Qupot = sum((u^3.8) * dt) / 233847
 
-    Where:
-    - wind_factor depends on wind speed (higher speed = more drift)
-    - temperature_factor depends on temperature (colder = more cohesive)
+    Parameters:
+        hourly_wind_speeds: array of wind speeds [m/s]
+        dt: time step in seconds (default 3600 for hourly data)
+
+    Returns:
+        float: Potential wind-driven transport [kg/m]
+    """
+    total = sum((u**3.8) * dt for u in hourly_wind_speeds) / 233847
+    return total
+
+
+def sector_index(direction):
+    """
+    Given a wind direction in degrees, returns the index (0-15)
+    corresponding to a 16-sector division.
+    """
+    # Center the bin by adding 11.25 degrees then modulo 360 and divide by 22.5 degrees
+    return int(((direction + 11.25) % 360) // 22.5)
+
+
+def compute_sector_transport(hourly_wind_speeds, hourly_wind_dirs, dt=3600):
+    """
+    Compute the cumulative transport for each of 16 wind sectors.
+
+    Parameters:
+        hourly_wind_speeds: list of wind speeds [m/s]
+        hourly_wind_dirs: list of wind directions [degrees]
+        dt: time step in seconds
+
+    Returns:
+        A list of 16 transport values (kg/m) corresponding to the sectors.
+    """
+    sectors = [0.0] * 16
+    for u, d in zip(hourly_wind_speeds, hourly_wind_dirs):
+        idx = sector_index(d)
+        sectors[idx] += ((u**3.8) * dt) / 233847
+    return sectors
+
+
+def calculate_snow_drift(df, T=3000, F=30000, theta=0.5):
+    """
+    Calculate snow drift using Tabler (2003) methodology.
+
+    This implements the complete Tabler (2003) snow drift calculation including:
+    - Potential wind-driven transport (Qupot)
+    - Snowfall-limited transport (Qspot)
+    - Relocated water equivalent (Srwe)
+    - Mean annual snow transport (Qt)
+
+    Parameters:
+        df: DataFrame with hourly weather data
+        T: Maximum transport distance (m) - default 3000m
+        F: Fetch distance (m) - default 30000m
+        theta: Relocation coefficient - default 0.5
+
+    Returns:
+        DataFrame with added columns:
+            - Swe_hourly: Hourly snow water equivalent [mm]
+            - wind_transport: Hourly wind transport contribution [kg/m]
+            - snow_drift: Cumulative snow drift [kg/m]
     """
 
-    # Wind drift factor: exponential relationship with wind speed
-    # Drift starts at ~3 m/s and increases rapidly
-    df['wind_factor'] = np.where(
-        df['windspeed'] < 3,
-        0,  # No drift below 3 m/s
-        np.minimum((df['windspeed'] - 3) ** 1.5 / 10, 5)  # Cap at 5x
+    # Calculate hourly Swe: precipitation counts when temperature < +1 degrees C
+    df['Swe_hourly'] = df.apply(
+        lambda row: row['precipitation'] if row['temperature'] < 1 else 0,
+        axis=1
     )
 
-    # Temperature factor: snow drifts more when it's cold and dry
-    # Optimal drift: -5°C to -15°C
-    df['temp_factor'] = np.where(
-        df['temperature'] > 0,
-        0.1,  # Wet snow, less drift
-        np.where(
-            df['temperature'] < -15,
-            0.5,  # Very cold, crystals don't bind well
-            1.0 + (df['temperature'] + 5) / 10  # Optimal range
-        )
-    )
+    # Calculate total Swe for the period
+    total_Swe = df['Swe_hourly'].sum()
 
-    # Calculate snow drift (mm of snow equivalent)
-    df['snow_drift'] = df['snowfall'] * df['wind_factor'] * df['temp_factor']
+    # Get wind speeds as list
+    wind_speeds = df['windspeed'].tolist()
 
-    # Ensure non-negative
-    df['snow_drift'] = df['snow_drift'].clip(lower=0)
+    # Calculate Qupot (potential wind-driven transport)
+    Qupot = compute_Qupot(wind_speeds, dt=3600)
+
+    # Calculate Qspot (snowfall-limited transport)
+    Qspot = 0.5 * T * total_Swe
+
+    # Calculate Srwe (relocated water equivalent)
+    Srwe = theta * total_Swe
+
+    # Determine controlling process
+    if Qupot > Qspot:
+        Qinf = 0.5 * T * Srwe
+        control = "Snowfall controlled"
+    else:
+        Qinf = Qupot
+        control = "Wind controlled"
+
+    # Calculate Qt (mean annual snow transport)
+    Qt = Qinf * (1 - 0.14 ** (F / T))
+
+    # Calculate hourly wind transport contributions for visualization
+    df['wind_transport'] = ((df['windspeed']**3.8) * 3600) / 233847
+
+    # Calculate cumulative snow drift
+    df['snow_drift'] = df['wind_transport'].cumsum()
+
+    # Store metadata
+    df.attrs['Qupot'] = Qupot
+    df.attrs['Qspot'] = Qspot
+    df.attrs['Srwe'] = Srwe
+    df.attrs['Qinf'] = Qinf
+    df.attrs['Qt'] = Qt
+    df.attrs['control'] = control
+    df.attrs['total_Swe'] = total_Swe
 
     return df
 
@@ -215,7 +294,31 @@ with st.spinner("Calculating snow drift..."):
     weather_df = calculate_snow_drift(weather_df)
 
 
-# Display statistics
+# Display Tabler (2003) statistics
+st.subheader("Snow Transport Analysis (Tabler 2003)")
+
+# Get stored metadata
+Qt = weather_df.attrs.get('Qt', 0)
+Qupot = weather_df.attrs.get('Qupot', 0)
+Qspot = weather_df.attrs.get('Qspot', 0)
+control = weather_df.attrs.get('control', 'Unknown')
+total_Swe = weather_df.attrs.get('total_Swe', 0)
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.metric("Mean Annual Snow Transport (Qt)", f"{Qt/1000:.1f} tonnes/m")
+
+with col2:
+    st.metric("Total Snow Water Equiv (Swe)", f"{total_Swe:.2f} mm")
+
+with col3:
+    st.metric("Potential Transport (Qupot)", f"{Qupot:.0f} kg/m")
+
+with col4:
+    st.metric("Process Control", control)
+
+# Additional weather stats
 st.subheader("Weather Statistics")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -224,7 +327,7 @@ with col1:
     st.metric("Total Snowfall", f"{weather_df['snowfall'].sum():.2f} mm")
 
 with col2:
-    st.metric("Total Snow Drift", f"{weather_df['snow_drift'].sum():.2f} mm")
+    st.metric("Total Precipitation", f"{weather_df['precipitation'].sum():.2f} mm")
 
 with col3:
     st.metric("Avg Wind Speed", f"{weather_df['windspeed'].mean():.2f} m/s")
@@ -296,14 +399,49 @@ fig_yearly.update_layout(
 st.plotly_chart(fig_yearly, use_container_width=True)
 
 
-# Wind Rose
-st.subheader("Wind Rose Diagram")
+# Wind Rose with Directional Transport
+st.subheader("Wind Rose with Directional Snow Transport")
 
-wind_rose_fig = create_wind_rose(weather_df)
-st.plotly_chart(wind_rose_fig, use_container_width=True)
+# Calculate sector-wise transport
+ws = weather_df['windspeed'].tolist()
+wdir = weather_df['winddirection'].tolist()
+sectors = compute_sector_transport(ws, wdir)
+
+# Convert to tonnes/m
+sectors_tonnes = [s / 1000.0 for s in sectors]
+
+# Create directional wind rose
+direction_labels = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                   'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+
+fig_wind_transport = go.Figure()
+
+fig_wind_transport.add_trace(go.Barpolar(
+    r=sectors_tonnes,
+    theta=direction_labels,
+    marker=dict(
+        color=sectors_tonnes,
+        colorscale='Blues',
+        showscale=True,
+        colorbar=dict(title="Transport<br>(tonnes/m)")
+    ),
+    hovertemplate='%{theta}<br>Transport: %{r:.2f} tonnes/m<extra></extra>'
+))
+
+fig_wind_transport.update_layout(
+    title=f"Directional Snow Transport Distribution<br>Total Qt: {Qt/1000:.1f} tonnes/m",
+    polar=dict(
+        radialaxis=dict(showticklabels=True, ticks=''),
+        angularaxis=dict(direction="clockwise")
+    ),
+    height=500
+)
+
+st.plotly_chart(fig_wind_transport, use_container_width=True)
 
 st.markdown("""
-The wind rose shows the frequency of wind from different directions.
+The wind rose shows snow transport by direction using Tabler (2003) formulas.
+Each sector represents the cumulative wind-driven transport from that direction.
 Prevailing wind directions contribute most to snow drift patterns.
 """)
 
@@ -391,26 +529,41 @@ st.plotly_chart(fig_daily, use_container_width=True)
 
 
 # Information
-with st.expander("ℹ️ About Snow Drift Calculations"):
+with st.expander("ℹ️ About Tabler (2003) Snow Drift Methodology"):
     st.markdown("""
-    ### Snow Drift Physics
+    ### Tabler (2003) Snow Drift Calculations
 
-    Snow drift is the transport of snow by wind. The calculations use:
+    This page implements the complete snow drift calculation methodology from Tabler (2003).
 
-    **Wind Factor:**
-    - Drift starts at wind speeds above 3 m/s
-    - Increases exponentially with wind speed
-    - Higher winds = more snow movement
+    **Key Parameters:**
 
-    **Temperature Factor:**
-    - Optimal drift: -5°C to -15°C
-    - Warmer (wet snow): Less drift
-    - Very cold (<-15°C): Crystals don't bind well
+    1. **Qupot (Potential Wind-Driven Transport):**
+       - Formula: sum((u^3.8) * dt) / 233847
+       - Based on hourly wind speed data
+       - Represents maximum possible transport by wind
 
-    **Formula:**
-    ```
-    Snow Drift = Snowfall × Wind Factor × Temperature Factor
-    ```
+    2. **Qspot (Snowfall-Limited Transport):**
+       - Formula: 0.5 * T * Swe
+       - T = Maximum transport distance (3000m default)
+       - Swe = Snow Water Equivalent (total snowfall when temp < 1C)
+
+    3. **Srwe (Relocated Water Equivalent):**
+       - Formula: theta * Swe
+       - theta = Relocation coefficient (0.5 default)
+
+    4. **Qinf (Controlling Transport):**
+       - If Qupot > Qspot: Qinf = 0.5 * T * Srwe (snowfall controlled)
+       - Otherwise: Qinf = Qupot (wind controlled)
+
+    5. **Qt (Mean Annual Snow Transport):**
+       - Formula: Qinf * (1 - 0.14^(F/T))
+       - F = Fetch distance (30000m default)
+       - Final result in tonnes/m
+
+    **Wind Rose:**
+    - 16-sector directional analysis
+    - Shows cumulative transport from each direction
+    - Uses same u^3.8 wind power formula
 
     **Water Year:**
     - Defined as July 1 to June 30
@@ -418,6 +571,8 @@ with st.expander("ℹ️ About Snow Drift Calculations"):
     - Allows complete winter cycle analysis
 
     **Data Source:** Open-Meteo ERA5 reanalysis
+
+    **Reference:** Tabler, R.D. (2003). Controlling Blowing and Drifting Snow with Snow Fences and Road Design.
     """)
 
 
