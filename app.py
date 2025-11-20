@@ -6,23 +6,22 @@ from lib.mongodb_client import load_production_2021, check_mongodb_connection
 from notebooks.utils_analysis import stl_production_plot, spectrogram_production_plot
 
 st.set_page_config(
-    page_title="IND320 Assignment 3 — Isma Sohail",
+    page_title="IND320 Assignment 2 — Isma Sohail",
     page_icon="🌦️",
     layout="wide"
 )
 
 st.sidebar.title("Navigation")
-st.sidebar.markdown("### 📊 IND320 — Assignment 3")
+st.sidebar.markdown("### 📊 IND320 — Assignment 2")
 page = st.sidebar.radio("Select Page:", [
     "🏠 Home",
     "📍 Price Area Selector",
     "📈 Weather Analysis (STL + Spectrogram)",
-    "⚡ Production Anomalies (SPC + LOF)"
 ])
 
 # --- HOME ---
 if page == "🏠 Home":
-    st.title("🌦️ IND320 Assignment 3 — Weather & Energy Analysis")
+    st.title("🌦️ IND320 Assignment 2 — Weather & Energy Analysis")
     st.write("This Streamlit app integrates Open-Meteo ERA5 data with Elhub production datasets from MongoDB.")
     st.markdown("**Student:** Isma Sohail  \n**Course:** IND320 — NMBU")
 
