@@ -2,6 +2,7 @@ import streamlit as st
 from pathlib import Path
 import pandas as pd
 from lib.open_meteo import fetch_era5
+from lib.mongodb_client import load_production_2021, check_mongodb_connection
 from notebooks.utils_analysis import stl_production_plot, spectrogram_production_plot
 
 st.set_page_config(
@@ -22,8 +23,17 @@ page = st.sidebar.radio("Select Page:", [
 # --- HOME ---
 if page == "🏠 Home":
     st.title("🌦️ IND320 Assignment 3 — Weather & Energy Analysis")
-    st.write("This Streamlit app integrates Open-Meteo ERA5 data with Elhub-style production datasets.")
+    st.write("This Streamlit app integrates Open-Meteo ERA5 data with Elhub production datasets from MongoDB.")
     st.markdown("**Student:** Isma Sohail  \n**Course:** IND320 — NMBU")
+
+    # Show MongoDB connection status
+    st.subheader("📊 Database Status")
+    mongo_status = check_mongodb_connection()
+    if mongo_status['status'] == 'connected':
+        st.success(f"✅ {mongo_status['message']}")
+        st.info(f"📝 Documents in production_2021: {mongo_status['document_count']:,}")
+    else:
+        st.error(f"❌ {mongo_status['message']}")
 
 # --- PRICE AREA SELECTOR ---
 elif page == "📍 Price Area Selector":
@@ -61,7 +71,11 @@ elif page == "📈 Weather Analysis (STL + Spectrogram)":
         st.error(f"Failed to fetch ERA5: {e}")
 
     st.markdown("### 🔹 STL Decomposition (Production)")
-    prod = pd.read_csv("data/production_per_group_mba_hour.csv")
+    # Load from MongoDB (NO CSV!)
+    prod = load_production_2021()
+    if prod.empty:
+        st.error("Failed to load production data from MongoDB")
+        st.stop()
     fig = stl_production_plot(prod, area="NO5", group="Hydro")
     st.pyplot(fig)
 
