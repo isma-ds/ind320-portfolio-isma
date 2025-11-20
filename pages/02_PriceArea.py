@@ -102,23 +102,37 @@ else:
 
 # line chart of hourly production - REAL DATA from MongoDB
 df_full = load_production_2021()
-df_line = df_full[
-    (df_full['priceArea'] == area) &
-    (df_full['productionGroup'].isin(groups)) &
-    (df_full['startTime'].dt.month == month)
-].copy()
 
-# Rename columns for compatibility
-df_line = df_line.rename(columns={'startTime': 'time', 'quantityKwh': 'quantitykWh'})
+if df_full.empty:
+    st.warning("No data available from MongoDB")
+else:
+    # Filter data
+    if groups:
+        df_line = df_full[
+            (df_full['priceArea'] == area) &
+            (df_full['productionGroup'].isin(groups)) &
+            (df_full['startTime'].dt.month == month)
+        ].copy()
 
-fig_line = px.line(
-    df_line,
-    x="time",
-    y="quantitykWh",
-    color="productionGroup",
-    title=f"Hourly production — {area}, month={month}"
-)
-st.plotly_chart(fig_line, use_container_width=True)
+        if df_line.empty:
+            st.warning(f"No data found for {area}, month {month} with selected production groups")
+            # Show available months for debugging
+            available_months = df_full[df_full['priceArea'] == area]['startTime'].dt.month.unique()
+            st.info(f"Available months for {area}: {sorted(available_months.tolist())}")
+        else:
+            # Rename columns for compatibility
+            df_line = df_line.rename(columns={'startTime': 'time', 'quantityKwh': 'quantitykWh'})
+
+            fig_line = px.line(
+                df_line,
+                x="time",
+                y="quantitykWh",
+                color="productionGroup",
+                title=f"Hourly production — {area}, month={month}"
+            )
+            st.plotly_chart(fig_line, use_container_width=True)
+    else:
+        st.warning("Please select at least one production group to view the line chart")
 
 # ------------- Footer / Data Source -------------
 with st.expander("📂 Data Source"):
