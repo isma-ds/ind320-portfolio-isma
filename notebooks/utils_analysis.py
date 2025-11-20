@@ -28,9 +28,9 @@ def _series(df: pd.DataFrame, area: str, group: str) -> pd.Series:
     area_col, group_col, time_col, qty_col = _colnames(df)
 
     # ensure datetime
-    if not np.issubdtype(df[time_col].dtype, np.datetime64):
+    if not pd.api.types.is_datetime64_any_dtype(df[time_col]):
         df = df.copy()
-        df[time_col] = pd.to_datetime(df[time_col], utc=True, errors="coerce")
+        df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
 
     ts = (
         df[(df[area_col] == area) & (df[group_col] == group)]
