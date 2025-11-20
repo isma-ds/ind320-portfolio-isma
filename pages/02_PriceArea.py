@@ -70,8 +70,15 @@ elhub_df = load_real_elhub_monthly()
 st.subheader("Select price area")
 area = st.radio("", ["NO1", "NO2", "NO3", "NO4", "NO5"], index=4, horizontal=True)
 
+# Get available production groups from actual data
+available_groups = [col for col in elhub_df.columns if col not in ['priceArea', 'month']]
+
+if not available_groups:
+    st.error("No production groups found in MongoDB data")
+    st.stop()
+
 st.subheader("Production groups")
-groups = st.multiselect("Select production groups", ["Hydro", "Wind", "Thermal"], default=["Hydro", "Wind"])
+groups = st.multiselect("Select production groups", available_groups, default=available_groups[:2] if len(available_groups) >= 2 else available_groups)
 
 st.subheader("Month")
 month = st.selectbox("Select month", list(range(1, 13)), index=1)
@@ -80,10 +87,18 @@ month = st.selectbox("Select month", list(range(1, 13)), index=1)
 df_area = elhub_df[elhub_df["priceArea"] == area]
 
 # pie chart of total production
-totals = df_area[groups].sum().reset_index()
-totals.columns = ["Group", "Production"]
-fig_pie = px.pie(totals, names="Group", values="Production", title=f"Total production in 2021 — {area}")
-st.plotly_chart(fig_pie, use_container_width=True)
+if groups:
+    # Only select columns that exist in the dataframe
+    valid_groups = [g for g in groups if g in df_area.columns]
+    if valid_groups:
+        totals = df_area[valid_groups].sum().reset_index()
+        totals.columns = ["Group", "Production"]
+        fig_pie = px.pie(totals, names="Group", values="Production", title=f"Total production in 2021 — {area}")
+        st.plotly_chart(fig_pie, use_container_width=True)
+    else:
+        st.warning("No valid production groups selected")
+else:
+    st.warning("Please select at least one production group")
 
 # line chart of hourly production - REAL DATA from MongoDB
 df_full = load_production_2021()
