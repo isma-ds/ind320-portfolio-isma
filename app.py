@@ -78,12 +78,12 @@ elif page == "📈 Weather Analysis (STL + Spectrogram)":
         st.stop()
     result = stl_production_plot(prod, area="NO5", group="Hydro")
     fig = result[0] if isinstance(result, tuple) else result
-    st.pyplot(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("### 🔹 Spectrogram (Production)")
     result2 = spectrogram_production_plot(prod, area="NO5", group="Hydro")
     fig2 = result2[0] if isinstance(result2, tuple) else result2
-    st.pyplot(fig2)
+    st.plotly_chart(fig2, use_container_width=True)
 
 # --- ANOMALIES PAGE ---
 elif page == "⚡ Production Anomalies (SPC + LOF)":
