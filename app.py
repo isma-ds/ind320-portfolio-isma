@@ -76,11 +76,13 @@ elif page == "📈 Weather Analysis (STL + Spectrogram)":
     if prod.empty:
         st.error("Failed to load production data from MongoDB")
         st.stop()
-    fig = stl_production_plot(prod, area="NO5", group="Hydro")
+    result = stl_production_plot(prod, area="NO5", group="Hydro")
+    fig = result[0] if isinstance(result, tuple) else result
     st.pyplot(fig)
 
     st.markdown("### 🔹 Spectrogram (Production)")
-    fig2 = spectrogram_production_plot(prod, area="NO5", group="Hydro")
+    result2 = spectrogram_production_plot(prod, area="NO5", group="Hydro")
+    fig2 = result2[0] if isinstance(result2, tuple) else result2
     st.pyplot(fig2)
 
 # --- ANOMALIES PAGE ---

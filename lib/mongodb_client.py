@@ -64,9 +64,9 @@ def load_production_2021():
             st.warning("No data found in MongoDB collection: production_2021")
             return pd.DataFrame()
 
-        # Convert timestamps
+        # Convert timestamps (remove timezone for compatibility)
         if 'startTime' in df.columns:
-            df['startTime'] = pd.to_datetime(df['startTime'])
+            df['startTime'] = pd.to_datetime(df['startTime']).dt.tz_localize(None)
 
         st.sidebar.success(f"✅ Loaded {len(df):,} records from MongoDB")
         return df
