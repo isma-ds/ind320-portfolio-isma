@@ -1,91 +1,88 @@
 import streamlit as st
-from pathlib import Path
-import pandas as pd
-from lib.open_meteo import fetch_era5
-from lib.mongodb_client import load_production_2021, check_mongodb_connection
-from notebooks.utils_analysis import stl_production_plot, spectrogram_production_plot
+from lib.mongodb_client import check_mongodb_connection
 
 st.set_page_config(
-    page_title="IND320 Assignment 2 — Isma Sohail",
+    page_title="IND320 Assignment 3 — Isma Sohail",
     page_icon="🌦️",
     layout="wide"
 )
 
-st.sidebar.title("Navigation")
-st.sidebar.markdown("### 📊 IND320 — Assignment 2")
-page = st.sidebar.radio("Select Page:", [
-    "🏠 Home",
-    "📍 Price Area Selector",
-    "📈 Weather Analysis (STL + Spectrogram)",
-])
+# --- HOME PAGE ---
+st.title("🌦️ IND320 Assignment 3 — Advanced Weather & Energy Analysis")
 
-# --- HOME ---
-if page == "🏠 Home":
-    st.title("🌦️ IND320 Assignment 2 — Weather & Energy Analysis")
-    st.write("This Streamlit app integrates Open-Meteo ERA5 data with Elhub production datasets from MongoDB.")
-    st.markdown("**Student:** Isma Sohail  \n**Course:** IND320 — NMBU")
+st.markdown("""
+Welcome to the IND320 Assignment 3 Streamlit app! This application demonstrates advanced 
+time series analysis techniques including:
 
-    # Show MongoDB connection status
-    st.subheader("📊 Database Status")
-    mongo_status = check_mongodb_connection()
+- **STL Decomposition** - Seasonal-Trend decomposition using LOESS
+- **Spectrogram Analysis** - Frequency-time domain visualization
+- **Temperature Outlier Detection** - Using DCT + Statistical Process Control
+- **Precipitation Anomaly Detection** - Using Local Outlier Factor
+
+### 📊 Data Sources
+- **Elhub Production Data** (2021) - From MongoDB Atlas
+- **Open-Meteo Weather Data** (ERA5 Historical Reanalysis)
+
+### 🎓 Student Information
+**Name:** Isma Sohail  
+**Course:** IND320 — NMBU  
+**Assignment:** Part 3 of 4
+
+---
+""")
+
+# Show MongoDB connection status
+st.subheader("📊 Database Status")
+mongo_status = check_mongodb_connection()
+
+col1, col2 = st.columns(2)
+
+with col1:
     if mongo_status['status'] == 'connected':
-        st.success(f"✅ {mongo_status['message']}")
-        st.info(f"📝 Documents in production_2021: {mongo_status['document_count']:,}")
+        st.success(f"✅ MongoDB Connected")
+        st.metric("Documents in production_2021", f"{mongo_status['document_count']:,}")
     else:
-        st.error(f"❌ {mongo_status['message']}")
+        st.error(f"❌ MongoDB Disconnected")
+        st.caption(mongo_status['message'])
 
-# --- PRICE AREA SELECTOR ---
-elif page == "📍 Price Area Selector":
-    st.title("📍 Select Electricity Price Area")
+with col2:
+    st.info("📡 Open-Meteo API")
+    st.caption("ERA5 Historical Reanalysis (2021)")
 
-    cities = pd.DataFrame({
-        "priceArea": ["NO1", "NO2", "NO3", "NO4", "NO5"],
-        "city": ["Oslo", "Kristiansand", "Trondheim", "Tromsø", "Bergen"],
-        "lat": [59.9139, 58.1467, 63.4305, 69.6492, 60.3929],
-        "lon": [10.7522, 7.9956, 10.3951, 18.9553, 5.3241]
-    })
+# Navigation Guide
+st.markdown("---")
+st.subheader("📍 Navigation Guide")
 
-    st.dataframe(cities)
-    selected_city = st.selectbox("Choose a city:", cities["city"])
-    st.session_state["city"] = selected_city
-    st.success(f"✅ Selected {selected_city}")
+st.markdown("""
+Use the sidebar to navigate between pages:
 
-# --- WEATHER ANALYSIS ---
-elif page == "📈 Weather Analysis (STL + Spectrogram)":
-    st.title("📈 Weather Analysis (STL + Spectrogram)")
-    city = st.session_state.get("city", "Bergen")
-    st.write(f"Using {city} for 2021 (ERA5 reanalysis)")
+1. **🏠 Home** - This page
+2. **⚡ Price Area** - Select electricity price areas (NO1-NO5)
+3. **📈 Analysis A** - STL Decomposition & Spectrogram (Production Data)
+4. **📄 Data Table** - Weather data table with line charts
+5. **📊 Plot Page** - Interactive weather data plots
+6. **🌡️ Analysis B** - Temperature Outliers (SPC) & Precipitation Anomalies (LOF)
+7. **💾 Mongo Status** - Database connection details
 
-    st.markdown("### ⛅ Fetching data from Open-Meteo API...")
-    try:
-        cities = {
-            "Bergen": (60.3929, 5.3241),
-            "Oslo": (59.9139, 10.7522),
-            "Trondheim": (63.4305, 10.3951)
-        }
-        lat, lon = cities.get(city, (60.3929, 5.3241))
-        df = fetch_era5(lat, lon, 2021)
-        st.write(df.head())
-    except Exception as e:
-        st.error(f"Failed to fetch ERA5: {e}")
+### 🎯 Assessment 3 Features
 
-    st.markdown("### 🔹 STL Decomposition (Production)")
-    # Load from MongoDB (NO CSV!)
-    prod = load_production_2021()
-    if prod.empty:
-        st.error("Failed to load production data from MongoDB")
-        st.stop()
-    result = stl_production_plot(prod, area="NO5", group="Hydro")
-    fig = result[0] if isinstance(result, tuple) else result
-    st.plotly_chart(fig, use_container_width=True, key="stl_plot")
+**New in Assignment 3:**
+- ✅ Page reorganization (1, 4, New A, 2, 3, New B, 5)
+- ✅ Analysis A with tabs (STL + Spectrogram)
+- ✅ Analysis B with tabs (SPC + LOF)
+- ✅ Open-Meteo API integration
+- ✅ Advanced signal processing techniques
 
-    st.markdown("### 🔹 Spectrogram (Production)")
-    result2 = spectrogram_production_plot(prod, area="NO5", group="Hydro")
-    fig2 = result2[0] if isinstance(result2, tuple) else result2
-    st.plotly_chart(fig2, use_container_width=True, key="spectrogram_plot")
+---
 
-# --- ANOMALIES PAGE ---
-elif page == "⚡ Production Anomalies (SPC + LOF)":
-    st.title("⚡ Outlier & Anomaly Detection")
-    st.markdown("Includes DCT-based SPC analysis for temperature and LOF-based precipitation anomaly detection.")
-    st.markdown("👉 Implemented in Jupyter Notebook (`IND320_Assignment3.ipynb`) for reproducibility.")
+### 🚀 Quick Start
+
+1. **Select a price area** on the Price Area page
+2. **Explore Analysis A** for production data insights
+3. **Check Analysis B** for weather outliers and anomalies
+
+""")
+
+# Footer
+st.markdown("---")
+st.caption("IND320 — Data Science and Analytics | NMBU | 2024-2025")
