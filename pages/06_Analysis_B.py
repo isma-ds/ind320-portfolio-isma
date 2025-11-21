@@ -87,80 +87,142 @@ except Exception:
         pass
 df = df.dropna(subset=["time"])
 
-# ---------- Controls ----------
-st.markdown("### Controls")
-colA, colB = st.columns(2)
-with colA:
-    cutoff = st.slider("DCT high-pass cutoff (keep high frequencies ≥ this index)",
-                       min_value=2, max_value=120, value=30, step=1)
-with colB:
-    k_sigma = st.slider("SPC threshold (k × MAD)",
-                        min_value=1.0, max_value=6.0, value=3.0, step=0.1)
-st.caption("SPC outliers are computed on **temperature** using a DCT high-pass + MAD bounds.")
+# ---------- Create Tabs for SPC and LOF ----------
+tabs = st.tabs(["🌡️ Temperature Outliers (SPC)", "🌧️ Precipitation Anomalies (LOF)"])
 
-# ---------- SPC on temperature ----------
-y = df["temperature_2m"].to_numpy()
-Y = dct(y, type=2, norm="ortho")
-cut = np.clip(cutoff, 0, len(Y) - 1)
-Y[:cut] = 0.0
-satv = idct(Y, type=2, norm="ortho")
+# ========== TAB 1: SPC (Temperature Outliers) ==========
+with tabs[0]:
+    st.markdown("### Temperature Outlier Detection using DCT + SPC")
+    st.markdown("""
+    This analysis uses **Direct Cosine Transform (DCT)** for high-pass filtering to create 
+    Seasonally Adjusted Temperature Variations (SATV), then applies **Statistical Process Control (SPC)** 
+    with robust statistics (median + MAD) to identify outliers.
+    """)
+    
+    # Controls
+    colA, colB = st.columns(2)
+    with colA:
+        cutoff = st.slider("DCT high-pass cutoff (keep high frequencies ≥ this index)",
+                           min_value=2, max_value=120, value=30, step=1, key="spc_cutoff")
+    with colB:
+        k_sigma = st.slider("SPC threshold (k × MAD)",
+                            min_value=1.0, max_value=6.0, value=3.0, step=0.1, key="spc_sigma")
+    
+    # SPC Analysis
+    y = df["temperature_2m"].to_numpy()
+    Y = dct(y, type=2, norm="ortho")
+    cut = np.clip(cutoff, 0, len(Y) - 1)
+    Y[:cut] = 0.0
+    satv = idct(Y, type=2, norm="ortho")
+    
+    med = np.median(satv)
+    mad = np.median(np.abs(satv - med))
+    sigma = 1.4826 * mad if mad > 0 else np.std(satv)
+    upper = k_sigma * sigma
+    lower = -k_sigma * sigma
+    is_out = (satv > upper) | (satv < lower)
+    
+    df_spc = pd.DataFrame({
+        "time": df["time"],
+        "temperature_2m": df["temperature_2m"],
+        "satv": satv,
+        "SPC upper": upper,
+        "SPC lower": lower,
+        "is_outlier": np.where(is_out, "True", "False")
+    })
+    
+    # Plot
+    fig_spc = px.scatter(
+        df_spc, x="time", y="temperature_2m", color="is_outlier",
+        color_discrete_map={"False": "#aaaaaa", "True": "red"},
+        title=f"Temperature with SPC outliers (k={k_sigma:.1f}, cutoff={cutoff})",
+    )
+    bounds_df = pd.DataFrame({"time": df["time"], "SPC lower": lower, "SPC upper": upper})
+    fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC lower").data)
+    fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC upper").data)
+    fig_spc.update_layout(legend_title="Outlier")
+    st.plotly_chart(fig_spc, use_container_width=True)
+    
+    # Statistics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Outliers", f"{is_out.sum():,}")
+    with col2:
+        st.metric("Outlier Percentage", f"{100.0 * is_out.sum() / len(df_spc):.2f}%")
+    with col3:
+        st.metric("MAD (Robust Std)", f"{mad:.3f}")
+    
+    # Expander with details
+    with st.expander("📊 View Outlier Details"):
+        outlier_df = df_spc[df_spc["is_outlier"] == "True"][["time", "temperature_2m", "satv"]]
+        st.dataframe(outlier_df, use_container_width=True)
 
-med = np.median(satv)
-mad = np.median(np.abs(satv - med))
-sigma = 1.4826 * mad if mad > 0 else np.std(satv)
-upper = k_sigma * sigma
-lower = -k_sigma * sigma
-is_out = (satv > upper) | (satv < lower)
+# ========== TAB 2: LOF (Precipitation Anomalies) ==========
+with tabs[1]:
+    st.markdown("### Precipitation Anomaly Detection using LOF")
+    st.markdown("""
+    This analysis uses **Local Outlier Factor (LOF)** to identify precipitation anomalies 
+    based on local density deviation. Points with significantly lower density than their 
+    neighbors are flagged as anomalies.
+    """)
+    
+    # Controls
+    col1, col2 = st.columns(2)
+    with col1:
+        lof_frac = st.slider("Proportion of outliers (contamination)", 
+                             0.01, 0.10, 0.01, step=0.01, key="lof_contamination")
+    with col2:
+        n_neighbors = st.slider("LOF neighbors", 5, 50, 20, step=1, key="lof_neighbors")
+    
+    # LOF Analysis
+    X = df[["precipitation"]].to_numpy()
+    lof = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=lof_frac)
+    labels = lof.fit_predict(X)  # -1 outlier, 1 inlier
+    is_anom = (labels == -1)
+    
+    df_lof = pd.DataFrame({
+        "time": df["time"],
+        "precipitation": df["precipitation"],
+        "is_anomaly": np.where(is_anom, "True", "False")
+    })
+    
+    # Plot
+    fig_lof = px.scatter(
+        df_lof, x="time", y="precipitation",
+        color="is_anomaly",
+        color_discrete_map={"False": "#8faadc", "True": "crimson"},
+        title=f"Precipitation anomalies by LOF (contamination={lof_frac:.2f}, k={n_neighbors})"
+    )
+    st.plotly_chart(fig_lof, use_container_width=True)
+    
+    # Statistics
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Total Anomalies", f"{is_anom.sum():,}")
+    with col2:
+        st.metric("Anomaly Percentage", f"{100.0 * is_anom.sum() / len(df_lof):.2f}%")
+    
+    # Expander with details
+    with st.expander("📊 View Anomaly Details"):
+        anomaly_df = df_lof[df_lof["is_anomaly"] == "True"][["time", "precipitation"]]
+        st.dataframe(anomaly_df, use_container_width=True)
 
-df_spc = pd.DataFrame({
-    "time": df["time"],
-    "temperature_2m": df["temperature_2m"],
-    "satv": satv,
-    "SPC upper": upper,
-    "SPC lower": lower,
-    "is_outlier": np.where(is_out, "True", "False")
-})
-
-fig_spc = px.scatter(
-    df_spc, x="time", y="temperature_2m", color="is_outlier",
-    color_discrete_map={"False": "#aaaaaa", "True": "red"},
-    title=f"Temperature with SPC outliers (k={k_sigma:.1f}, cutoff={cutoff})",
-)
-bounds_df = pd.DataFrame({"time": df["time"], "SPC lower": lower, "SPC upper": upper})
-fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC lower").data)
-fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC upper").data)
-fig_spc.update_layout(legend_title="Outlier")
-st.plotly_chart(fig_spc, use_container_width=True)
-st.markdown(f"**Outliers:** {is_out.sum()} / {len(df_spc)} "
-            f"({100.0 * is_out.sum() / len(df_spc):.2f}%).  **MAD:** {mad:.3f}")
-
-st.markdown("---")
-
-# ---------- LOF on precipitation ----------
-st.subheader("LOF anomalies — precipitation")
-col1, col2 = st.columns(2)
-with col1:
-    lof_frac = st.slider("Proportion of outliers (contamination)", 0.01, 0.10, 0.01, step=0.01)
-with col2:
-    n_neighbors = st.slider("LOF neighbors", 5, 50, 20, step=1)
-
-X = df[["precipitation"]].to_numpy()
-lof = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=lof_frac)
-labels = lof.fit_predict(X)  # -1 outlier, 1 inlier
-is_anom = (labels == -1)
-
-df_lof = pd.DataFrame({
-    "time": df["time"],
-    "precipitation": df["precipitation"],
-    "is_anomaly": np.where(is_anom, "True", "False")
-})
-
-fig_lof = px.scatter(
-    df_lof, x="time", y="precipitation",
-    color="is_anomaly",
-    color_discrete_map={"False": "#8faadc", "True": "crimson"},
-    title=f"Precipitation anomalies by LOF (contamination={lof_frac:.2f}, k={n_neighbors})"
-)
-st.plotly_chart(fig_lof, use_container_width=True)
-st.markdown(f"**Anomalies:** {is_anom.sum()} / {len(df_lof)} "
-            f"({100.0 * is_anom.sum() / len(df_lof):.2f}%).")
+# ---------- Data Source Documentation ----------
+with st.expander("📂 Data Source"):
+    st.markdown("""
+    ### Weather Data (Open-Meteo ERA5)
+    
+    **Source**: Open-Meteo API (https://open-meteo.com)  
+    **Model**: ERA5 Historical Reanalysis  
+    **Year**: 2021  
+    **Location**: Bergen, Norway (or selected city)  
+    **Resolution**: Hourly data  
+    **Variables**: Temperature (2m), Precipitation  
+    
+    **Analysis Methods**:
+    - **DCT (Direct Cosine Transform)**: Frequency-domain filtering to remove seasonal trends
+    - **SPC (Statistical Process Control)**: Robust outlier detection using median + MAD
+    - **LOF (Local Outlier Factor)**: Density-based anomaly detection
+    
+    **Note**: Data is cached locally at `data/open-meteo-subset.csv` for performance.
+    """)
