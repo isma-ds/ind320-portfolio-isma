@@ -26,3 +26,4 @@ env/
 
 # ✅ Do NOT ignore your app code
 # (No wildcard like "*" here!)
+notebook_env/

@@ -7,4 +7,4 @@ statsmodels>=0.14
 scipy>=1.11
 requests>=2.32
 matplotlib>=3.8
-pymongo
+pymongo>=4.0
