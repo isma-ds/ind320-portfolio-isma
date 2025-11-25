@@ -1,0 +1,65 @@
+General
+If you push new updates to the main branch of your GitHub repository before the peer review and teacher feedback, things will get cluttered.
+Create and use a new branch in the GitHub repository for new updates.
+When peer review and feedback are finished, merge your changes into the main branch.
+All project work in IND320 will result in personal hand-ins and online apps.
+A Jupyter Notebook run locally on your computer.
+This will be your basic development and documentation platform.
+Must include a brief description of AI usage.
+Must include a 300-500-word log describing the compulsory work (including both Jupyter Notebook and Streamlit experience).
+Must include links to your public GitHub repository and Streamlit app (see below) for the compulsory work.
+Document headings should be clear and usable for navigation during development.
+All code blocks must include enough comments to be understandable and reproducible if someone inherits your project.
+All code blocks must be run before an export to PDF so the messages and plots are shown. In addition, add the .ipynb file to the GitHub repository where you have your Streamlit project.
+A Streamlit app running from https://[yourproject].streamlit.app/.
+This is an online version of the project; accessing data has been uploaded to your MongoDB database, and data directly downloaded from open-meteo.com's API.
+The code, hosted at GitHub, must include relevant comments from the Jupyter Notebook and further comments regarding Streamlit usage.
+There are four parts in the project work, building on each other and resulting in a final portfolio and app to be presented at the end of the semester.
+Co-operation is applauded, and the use of AI tools is encouraged.
+Tasks
+Accounts and repositories
+Reuse your account, repository and Streamlit app from the previous part of the project work.
+Until peer review and feedback have been completed, push to a temporary GitHub branch for later merging.
+API
+Familiarize yourself with the API connection athttps://open-meteo.com/en/docs Links to an external page.
+Observe how you can select features and produce Python code.
+Be aware of multiple sub-sections that alter which type of data is selected.
+Jupyter Notebook
+Use Oslo, Kristiansand, Trondheim, Tromsø and Bergen as representatives for the five electricity price areas in Norway. Find their geographical center points in longitude and latitude. Save price area codes, city names, longitude and latitude in a Panda's data frame.
+Use the open-meteo API to retrieve historical reanalysis data using the ERA5 model for a single location as follows:
+Create a function for the API download task that takes a pair of longitude and latitude values, plus a year as input and downloads the same weather properties as were used in the CSV file in part 1 of the project work.
+Apply the function to download data for Bergen for the year 2019.
+Outliers and anomalies:
+Plot the temperature as a function of time.
+Perform a high-pass filtering of the temperature using Direct Cosine Transfer to create seasonally adjusted temperature variations (SATV).
+Add curves to the plot indicating Statistical Process Control boundaries between inliers and outliers based on the SATV according to robust statistics estimated from the whole year. Color outliers with a contrasting colour. Do not plot SATV values; only use them to find boundaries and outliers.
+Let the frequency cut-off for the DCT and the number of standard deviations be parameters with sensible defaults.
+Wrap this in a function that returns the plot and relevant summaries of the outliers, and test the function.
+Plot the precipitation as a function of time.
+Indicate anomalies according to the Local Outlier Factor method.
+Let the proportion of outliers be a parameter defaulting to 1%.
+Wrap this in a function that returns the plot and relevant summaries of the outliers, and test the function.
+Seasonal-Trend decomposition using LOESS (STL)
+Perform LOESS on the production data from elbub (downloaded in part 2 of the project) and plot its decomposition.
+Let the electricity price area, production group, period length, seasonal smoother, trend smoother and robust (true/false) be parameters, and give each of them sensible defaults.
+Wrap this in a function that returns the plot, and test the function.
+Spectrogram
+Create a spectrogram based on the production data from elhub.
+Let the electricity price area, production group, window length and window overlap be parameters, and give each of them sensible defaults.
+Wrap this in a function that returns the plot, and test the function.
+Remember to fill in the log and AI mentioned in the General section above.
+Streamlit app
+Update your Streamlit app from part 2 of the project according to the following points.
+Move page 4 (the one with the price area selector) in front of page 2, and add a new page between page 4 and page 3 and a new page between page 3 and page 5, ie,
+Old order: 1, 2, 3, 4, 5, new order: 1, 4, new A, 2, 3, new B, 5.
+Exchange the CSV import of meteorological data with the open-meteo API import.
+Let the choice of downloaded data depend on the selector that is now on page 2. Let the chosen year be 2021.
+Note! For each of the new pages below, consider whether you can depend on the area selector on page 2 or need a local one.
+On page "new A", use st.tabs() and fill the first tab with the STL analysis and the second tab with the Spectrogram. Add necessary UI elements and plots to both.
+On page "new B", use st.tabs() and fill the first tab with the Outlier/SPC analysis and the second tab with the Anomaly/LOF analysis. Add necessary UI elements, plots and statistics to both.
+Evaluation
+The uploaded PDF/HTML, GitHub repository, and Streamlit app will be assessed according to the recipe above.
+By one fellow student in peer review.
+By Liland or Kjæreng.
+TA/Teacher's feedback will be short and instructive regarding points of improvement and fulfillment of requirements.
+Final fulfillment of the course will be based on the four rounds of hand-ins seen as a whole

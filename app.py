@@ -1,118 +1,88 @@
 import streamlit as st
-from pathlib import Path
+from lib.mongodb_client import check_mongodb_connection
 
 st.set_page_config(
-    page_title="IND320 Portfolio — Isma Sohail",
-    page_icon="📊",
-    layout="wide",
+    page_title="IND320 Assignment 3 — Isma Sohail",
+    page_icon="🌦️",
+    layout="wide"
 )
 
-st.markdown(
-    """
-<style>
-[data-testid="stAppViewContainer"] {
-    background-color: #ffffff;
-    font-family: "Inter", sans-serif;
-    color: #1a1a1a;
-}
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #004b87, #007b83);
-    color: white;
-}
-[data-testid="stSidebar"] a {
-    color: #e8f9ff !important;
-    font-weight: 500;
-}
-[data-testid="stSidebarNavLink"] > div:hover {
-    background-color: rgba(255,255,255,0.15) !important;
-    border-radius: 8px;
-}
-.banner {
-    background: linear-gradient(90deg, #004b87, #00a8a8);
-    color: white;
-    padding: 30px 40px;
-    border-radius: 15px;
-    margin-bottom: 25px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
-.section {
-    background-color: rgba(255,255,255,0.85);
-    border-radius: 15px;
-    padding: 25px;
-    margin-bottom: 25px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-    backdrop-filter: blur(8px);
-}
-h1, h2, h3 {
-    color: #004b87;
-    font-weight: 600;
-}
-.footer {
-    text-align: center;
-    font-size: 13px;
-    color: #666;
-    margin-top: 2rem;
-}
-</style>
-""",
-    unsafe_allow_html=True,
-)
+# --- HOME PAGE ---
+st.title("🌦️ IND320 Assignment 3 — Advanced Weather & Energy Analysis")
 
-# Sidebar intro text
-st.sidebar.title("📂 Navigation")
-st.sidebar.info("Use the sidebar to switch between pages.")
+st.markdown("""
+Welcome to the IND320 Assignment 3 Streamlit app! This application demonstrates advanced 
+time series analysis techniques including:
 
-# Gradient Header
-st.markdown(
-    """
-<div class="banner">
-    <h1 style='margin-bottom:0;'>IND320 Portfolio — Isma Sohail</h1>
-    <h4 style='margin-top:5px;'>MSc Data Science | Norwegian University of Life Sciences (NMBU)</h4>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+- **STL Decomposition** - Seasonal-Trend decomposition using LOESS
+- **Spectrogram Analysis** - Frequency-time domain visualization
+- **Temperature Outlier Detection** - Using DCT + Statistical Process Control
+- **Precipitation Anomaly Detection** - Using Local Outlier Factor
 
-# Main Sections
-st.markdown(
-    """
-<div class="section">
-<h3>🌟 Welcome</h3>
-<p>This portfolio app presents my work for the <b>IND320 – Data to Decision</b> course.
-It demonstrates applied data science techniques through reproducible analysis, visual storytelling, and clean interface design.</p>
-</div>
+### 📊 Data Sources
+- **Elhub Production Data** (2021) - From MongoDB Atlas
+- **Open-Meteo Weather Data** (ERA5 Historical Reanalysis)
 
-<div class="section">
-<h3>🔍 Project Overview</h3>
-<ul>
-<li><b>📊 Data Table:</b> Explore the dataset interactively with row-wise sparklines.</li>
-<li><b>📈 Plots:</b> Compare variables over time or by month with dynamic selections.</li>
-<li><b>💡 About:</b> Read AI usage, reflection, and learning experiences.</li>
-</ul>
-</div>
+### 🎓 Student Information
+**Name:** Isma Sohail  
+**Course:** IND320 — NMBU  
+**Assignment:** Part 3 of 4
 
-<div class="section">
-<h3>🌐 Repository & Deployment</h3>
-<ul>
-<li>GitHub Repository: <a href="https://github.com/isma-ds/ind320-portfolio-isma" target="_blank">isma-ds/ind320-portfolio-isma</a></li>
-<li>Streamlit App: <a href="https://ind320-portfolio-isma.streamlit.app/" target="_blank">ind320-portfolio-isma.streamlit.app</a></li>
-</ul>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+---
+""")
 
-# CSV File Check
-data_path = Path("data/open-meteo-subset.csv")
-if data_path.exists():
-    st.success(f"✅ CSV file detected successfully at: `{data_path}`")
-else:
-    st.warning(
-        "⚠️ Please place `open-meteo-subset.csv` in the `data/` folder before running the app."
-    )
+# Show MongoDB connection status
+st.subheader("📊 Database Status")
+mongo_status = check_mongodb_connection()
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if mongo_status['status'] == 'connected':
+        st.success(f"✅ MongoDB Connected")
+        st.metric("Documents in production_2021", f"{mongo_status['document_count']:,}")
+    else:
+        st.error(f"❌ MongoDB Disconnected")
+        st.caption(mongo_status['message'])
+
+with col2:
+    st.info("📡 Open-Meteo API")
+    st.caption("ERA5 Historical Reanalysis (2021)")
+
+# Navigation Guide
+st.markdown("---")
+st.subheader("📍 Navigation Guide")
+
+st.markdown("""
+Use the sidebar to navigate between pages:
+
+1. **🏠 Home** - This page
+2. **⚡ Price Area** - Select electricity price areas (NO1-NO5)
+3. **📈 Analysis A** - STL Decomposition & Spectrogram (Production Data)
+4. **📄 Data Table** - Weather data table with line charts
+5. **📊 Plot Page** - Interactive weather data plots
+6. **🌡️ Analysis B** - Temperature Outliers (SPC) & Precipitation Anomalies (LOF)
+7. **💾 Mongo Status** - Database connection details
+
+### 🎯 Assessment 3 Features
+
+**New in Assignment 3:**
+- ✅ Page reorganization (1, 4, New A, 2, 3, New B, 5)
+- ✅ Analysis A with tabs (STL + Spectrogram)
+- ✅ Analysis B with tabs (SPC + LOF)
+- ✅ Open-Meteo API integration
+- ✅ Advanced signal processing techniques
+
+---
+
+### 🚀 Quick Start
+
+1. **Select a price area** on the Price Area page
+2. **Explore Analysis A** for production data insights
+3. **Check Analysis B** for weather outliers and anomalies
+
+""")
 
 # Footer
-st.markdown(
-    "<div class='footer'>✅ Live Version — Deployed via Streamlit Cloud | © 2025 Isma Sohail | IND320 Data to Decision</div>",
-    unsafe_allow_html=True,
-)
+st.markdown("---")
+st.caption("IND320 — Data Science and Analytics | NMBU | 2024-2025")

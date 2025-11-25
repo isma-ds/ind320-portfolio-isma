@@ -1,47 +1,29 @@
-# macOS system files
-.DS_Store
-
-# Byte-compiled / optimized / DLL files
+# --- Python cache and build files ---
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Distribution / packaging
-.Python
-env/
-venv/
-.venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
+*.so
+*.pyd
 *.egg-info/
-.installed.cfg
-*.egg
-
-# Jupyter and data
 .ipynb_checkpoints/
-*.csv
-*.parquet
-*.feather
 
-# Streamlit
-.streamlit/
-# Ignore everything outside the current project directory
-/*
-!/app.py
-!/README.md
-!/.gitignore
-!/requirements.txt
-!/.devcontainer/
-!/data/
-!/pages/
-!/notebooks/
+# --- Editors and OS ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+.env
+
+# --- Streamlit secrets (keep private) ---
+.streamlit/secrets.toml
+
+# --- Data (optional local storage) ---
+# data/*.json
+# data/*.parquet
+
+# ✅ Do NOT ignore your app code
+# (No wildcard like "*" here!)
+notebook_env/

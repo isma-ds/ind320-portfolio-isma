@@ -1,0 +1,58 @@
+General
+If you push new updates to the main branch of your GitHub repository before the peer review and teacher feedback, things will get cluttered.
+Create and use a new branch in the GitHub repository for new updates.
+When peer review and feedback are finished, merge your changes into the main branch.
+All project work in IND320 will result in personal hand-ins and online apps.
+A Jupyter Notebook run locally on your computer.
+This will be your basic development and documentation platform.
+Must include a brief description of AI usage.
+Must include a 300-500-word log describing the compulsory work (including both Jupyter Notebook and Streamlit experience).
+Must include links to your public GitHub repository and Streamlit app (see below) for the compulsory work.
+Document headings should be clear and usable for navigation during development.
+All code blocks must include enough comments to be understandable and reproducible if someone inherits your project.
+All code blocks must be run before an export to PDF so the messages and plots are shown. In addition, add the .ipynb file to the GitHub repository where you have your Streamlit project.
+A Streamlit app running from https://[yourproject].streamlit.app/.
+This is an online version of the project, accessing data that has been exported to CSV format and accessing your MongoDB database for additional data.
+The code, hosted at GitHub, must include relevant comments from the Jupyter Notebook and further comments regarding Streamlit usage.
+There are four parts in the project work, building on each other and resulting in a final portfolio and app to be presented at the end of the semester.
+Co-operation is applauded, and the use of AI tools is encouraged.
+Tasks
+Accounts and repositories
+Reuse your account, repository and Streamlit app from the previous part of the project work.
+Until peer review and feedback have been completed, push to a temporary GitHub branch for later merging.
+Local database: Cassandra
+If not already done, set up Cassandra and Spark as described in the book.
+Test that your Spark-Cassandra connection works.
+The Cassandra database will be accessed from the Jupyter Notebook and used to store data from the API mentioned later. 
+Remote database: MongoDB
+If not already done, prepare a MongoDB account at mongodb.com.
+Test that you can manipulate data from Python.
+The MongoDB database will store data that has been trimmed/curated/prepared through the Jupyter Notebook and Spark filtering.
+These data will be accessed directly from the Streamlit app.
+API
+Familiarize yourself with the API connection at . https://api.elhub.no Links to an external page.
+Observe how time is encoded and how transitions between summer and winter time are handled.
+Be aware of the time period limitations for each API request and how this differs between datasets.
+Jupyter Notebook
+Use the Elhub API to retrieve hourly production data for all price areas using PRODUCTION_PER_GROUP_MBA_HOUR for all days and hours of the year 2021.
+Extract only the list in productionPerGroupMbaHour, convert to a DataFrame, and insert the data into Cassandra using Spark.
+Use Spark to extract the columns priceArea, productionGroup, startTime, and quantityKwh from Cassandra.
+Create the following plots:
+A pie chart for the total production of the year from a chosen price area, where each piece of the pie is one of the production groups.
+A line plot for the first month of the year for a chosen price area. Make separate lines for each production group.
+Insert the Spark-extracted data into your MongoDB.
+Remember to fill in the log and AI mentioned in the General section above.
+Streamlit app
+Update your Streamlit app from part 1 of the project according to the following points.
+If you have something you would like to keep on page four, move it to a new page five.
+Establish a connection with your MongoDB database. When running this at streamlit.io, remember to copy your secrets to the webpage instead of exposing them on GitHub.
+On page four, split the view into two columns using st.columns.
+On the left side, use radio buttons (st.radio) to select a price area and display a pie chart like in the Jupyter Notebook
+On the right side, use pills (st.pills) to select which production groups to include and a selection element of your choice to select a month. Combine the price area, production group(s) and month, and display a line plot like in the Jupyter Notebook (but for any month).
+Below the columns, insert an expander (st.expander) where you briefly document the source of the data shown on the page.
+Evaluation
+The uploaded PDF/HTML, GitHub repository, and Streamlit app will be assessed according to the recipe above.
+By one fellow student in peer review.
+By Liland or Kjæreng.
+TA/Teacher's feedback will be short and instructive regarding points of improvement and fulfillment of requirements.
+Final fulfillment of the course will be based on the four rounds of hand-ins seen as a whole.
