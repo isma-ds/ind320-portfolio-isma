@@ -78,7 +78,7 @@ if not available_groups:
     st.stop()
 
 st.subheader("Production groups")
-groups = st.multiselect("Select production groups", available_groups, default=available_groups[:2] if len(available_groups) >= 2 else available_groups)
+groups = st.multiselect("Select production groups", available_groups, default=available_groups)
 
 st.subheader("Month")
 month = st.selectbox("Select month", list(range(1, 13)), index=1)

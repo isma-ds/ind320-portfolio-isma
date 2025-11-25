@@ -68,6 +68,10 @@ def load_production_2021():
         if 'startTime' in df.columns:
             df['startTime'] = pd.to_datetime(df['startTime']).dt.tz_localize(None)
 
+        # Filter out unspecified/x production groups (professor feedback fix)
+        if 'productionGroup' in df.columns:
+            df = df[~df['productionGroup'].isin(['unspecified', 'x', 'Unspecified', 'X'])]
+
         st.sidebar.success(f"✅ Loaded {len(df):,} records from MongoDB")
         return df
 

@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from statsmodels.tsa.seasonal import STL
 
 # ---------- column helpers (robust to variants) ----------
@@ -78,15 +79,30 @@ def stl_production_plot(
     period, seasonal, trend = _ensure_stl_params(len(ts.dropna()), period, seasonal, trend)
 
     res = STL(ts, period=period, seasonal=seasonal, trend=trend, robust=robust).fit()
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=ts.index, y=ts.values, name="Observed", mode="lines"))
-    fig.add_trace(go.Scatter(x=ts.index, y=res.trend, name="Trend", mode="lines"))
-    fig.add_trace(go.Scatter(x=ts.index, y=res.seasonal, name="Seasonal", mode="lines"))
-    fig.add_trace(go.Scatter(x=ts.index, y=res.resid, name="Resid", mode="lines"))
+
+    # FIXED: Create 4 separate subplots instead of overlaying (professor feedback fix)
+    fig = make_subplots(
+        rows=4, cols=1,
+        subplot_titles=("Observed", "Trend", "Seasonal", "Residual"),
+        vertical_spacing=0.08,
+        shared_xaxes=True
+    )
+
+    fig.add_trace(go.Scatter(x=ts.index, y=ts.values, name="Observed", mode="lines", line=dict(color='blue')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=ts.index, y=res.trend, name="Trend", mode="lines", line=dict(color='orange')), row=2, col=1)
+    fig.add_trace(go.Scatter(x=ts.index, y=res.seasonal, name="Seasonal", mode="lines", line=dict(color='green')), row=3, col=1)
+    fig.add_trace(go.Scatter(x=ts.index, y=res.resid, name="Residual", mode="lines", line=dict(color='red')), row=4, col=1)
+
+    fig.update_xaxes(title_text="Time", row=4, col=1)
+    fig.update_yaxes(title_text="kWh", row=1, col=1)
+    fig.update_yaxes(title_text="kWh", row=2, col=1)
+    fig.update_yaxes(title_text="kWh", row=3, col=1)
+    fig.update_yaxes(title_text="kWh", row=4, col=1)
+
     fig.update_layout(
-        title=f"STL — {area}/{group} (period={period}, trend={trend}, seasonal={seasonal})",
-        xaxis_title="time", yaxis_title="quantity kWh", legend=dict(orientation="h"),
-        height=420
+        title_text=f"STL Decomposition — {area}/{group} (period={period}, trend={trend}, seasonal={seasonal})",
+        height=800,
+        showlegend=False
     )
     return fig, True, ""
 
