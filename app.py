@@ -49,39 +49,6 @@ with col2:
     st.info("📡 Open-Meteo API")
     st.caption("ERA5 Historical Reanalysis (2021)")
 
-# Navigation Guide
-st.markdown("---")
-st.subheader("📍 Navigation Guide")
-
-st.markdown("""
-Use the sidebar to navigate between pages:
-
-1. **🏠 Home** - This page
-2. **⚡ Price Area** - Select electricity price areas (NO1-NO5)
-3. **📈 Analysis A** - STL Decomposition & Spectrogram (Production Data)
-4. **📄 Data Table** - Weather data table with line charts
-5. **📊 Plot Page** - Interactive weather data plots
-6. **🌡️ Analysis B** - Temperature Outliers (SPC) & Precipitation Anomalies (LOF)
-7. **💾 Mongo Status** - Database connection details
-
-### 🎯 Assessment 3 Features
-
-**New in Assignment 3:**
-- ✅ Page reorganization (1, 4, New A, 2, 3, New B, 5)
-- ✅ Analysis A with tabs (STL + Spectrogram)
-- ✅ Analysis B with tabs (SPC + LOF)
-- ✅ Open-Meteo API integration
-- ✅ Advanced signal processing techniques
-
----
-
-### 🚀 Quick Start
-
-1. **Select a price area** on the Price Area page
-2. **Explore Analysis A** for production data insights
-3. **Check Analysis B** for weather outliers and anomalies
-
-""")
 
 # Footer
 st.markdown("---")

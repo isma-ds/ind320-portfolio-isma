@@ -137,7 +137,12 @@ with tabs[0]:
         color_discrete_map={"False": "#aaaaaa", "True": "red"},
         title=f"Temperature with SPC outliers (k={k_sigma:.1f}, cutoff={cutoff})",
     )
-    bounds_df = pd.DataFrame({"time": df["time"], "SPC lower": lower, "SPC upper": upper})
+    # FIXED: Boundaries now follow the temperature curve (professor feedback fix)
+    bounds_df = pd.DataFrame({
+        "time": df["time"],
+        "SPC lower": df["temperature_2m"] - upper,  # temp minus threshold
+        "SPC upper": df["temperature_2m"] + upper   # temp plus threshold
+    })
     fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC lower").data)
     fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC upper").data)
     fig_spc.update_layout(legend_title="Outlier")
