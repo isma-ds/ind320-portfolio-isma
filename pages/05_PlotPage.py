@@ -33,7 +33,9 @@ df["time"] = pd.to_datetime(df["time"], utc=True)
 df["month"] = df["time"].dt.month
 
 # === Controls per spec ===
-cols = [c for c in df.columns if c not in ("time", "month")]
+# Only include numeric columns (exclude string columns like 'city', 'era5_year')
+cols = [c for c in df.columns if c not in ("time", "month", "city", "era5_year")
+        and pd.api.types.is_numeric_dtype(df[c])]
 choice = st.selectbox("Choose a column (or All)", ["All"] + cols, index=0)
 
 months_sorted = sorted(df["month"].unique())

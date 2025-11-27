@@ -39,7 +39,9 @@ df["month"] = pd.to_datetime(df["time"], utc=True).dt.month
 first_month = int(df["month"].min())
 month_df = df[df["month"] == first_month].reset_index(drop=True)
 
-vars_ = [c for c in df.columns if c not in ("time", "month")]
+# Only include numeric weather variables (exclude string columns like 'city', 'era5_year')
+vars_ = [c for c in df.columns if c not in ("time", "month", "city", "era5_year")
+         and pd.api.types.is_numeric_dtype(df[c])]
 rows = [{"variable": v, "first_month": month_df[v].tolist()} for v in vars_]
 table = pd.DataFrame(rows)
 
