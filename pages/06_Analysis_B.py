@@ -122,15 +122,21 @@ with tabs[0]:
     lower = -k_sigma * sigma
     is_out = (satv > upper) | (satv < lower)
     
+    # Calculate Trend (Original - SATV) to plot boundaries on the original scale
+    trend = y - satv
+    upper_boundary = trend + upper
+    lower_boundary = trend + lower
+
     df_spc = pd.DataFrame({
         "time": df["time"],
         "temperature_2m": df["temperature_2m"],
         "satv": satv,
-        "SPC upper": upper,
-        "SPC lower": lower,
+        "trend": trend,
+        "SPC upper": upper_boundary,
+        "SPC lower": lower_boundary,
         "is_outlier": np.where(is_out, "True", "False")
     })
-    
+
     # Plot
     fig_spc = px.scatter(
         df_spc, x="time", y="temperature_2m", color="is_outlier",
@@ -138,10 +144,11 @@ with tabs[0]:
         title=f"Temperature with SPC outliers (k={k_sigma:.1f}, cutoff={cutoff})",
     )
     # FIXED: Boundaries now follow the temperature curve (professor feedback fix)
+    # Using the correct formula: trend = temp - satv, boundaries = trend + limits
     bounds_df = pd.DataFrame({
         "time": df["time"],
-        "SPC lower": df["temperature_2m"] - upper,  # temp minus threshold
-        "SPC upper": df["temperature_2m"] + upper   # temp plus threshold
+        "SPC lower": lower_boundary,
+        "SPC upper": upper_boundary
     })
     fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC lower").data)
     fig_spc.add_traces(px.line(bounds_df, x="time", y="SPC upper").data)
