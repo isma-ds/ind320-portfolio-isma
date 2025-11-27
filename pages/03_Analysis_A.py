@@ -1,6 +1,9 @@
 # pages/03_Analysis_A.py
 import streamlit as st
 import pandas as pd
+import sys
+sys.path.append('..')
+from lib.mongodb_client import load_production_2021
 from notebooks.utils_analysis import (
     stl_production_plot, spectrogram_production_plot, combos_available
 )
@@ -8,12 +11,19 @@ from notebooks.utils_analysis import (
 st.set_page_config(page_title="Analysis A — STL & Spectrogram", page_icon="⚡", layout="wide")
 st.title("⚡ Analysis A — STL & Spectrogram (Elhub production)")
 
-# -------- data (CSV fallback) --------
+# -------- Load data from MongoDB (NO CSV!) --------
 @st.cache_data
 def load_prod():
-    path = "data/production_per_group_mba_hour.csv"
-    # read raw (no parse) then coerce later, because column names may vary
-    df = pd.read_csv(path)
+    """Load production data from MongoDB - NO CSV files!"""
+    df = load_production_2021()
+
+    if df.empty:
+        st.error("Failed to load production data from MongoDB")
+        return pd.DataFrame()
+
+    # Rename columns to match expected format for analysis functions
+    # MongoDB uses: priceArea, productionGroup, startTime, quantityKwh
+    # Analysis expects: priceArea, productionGroup, startTime, quantityKwh (same!)
     return df
 
 prod = load_prod()

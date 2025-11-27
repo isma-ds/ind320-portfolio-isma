@@ -21,8 +21,8 @@ env/
 .streamlit/secrets.toml
 
 # --- Data (optional local storage) ---
-# data/*.json
-# data/*.parquet
+# Local cache files - NOT committed to repo (Assessment 3 feedback)
+data/
 
 # ✅ Do NOT ignore your app code
 # (No wildcard like "*" here!)
