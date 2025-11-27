@@ -3,41 +3,36 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import os
 from datetime import datetime
 import sys
 sys.path.append('..')
 from lib.mongodb_client import load_production_2021, get_monthly_aggregation
+from lib.open_meteo import fetch_era5
 
 st.set_page_config(page_title="Price Area Dashboard", page_icon="⚡", layout="wide")
-st.title("⚡ Price Area Dashboard (Elhub demo + Open-Meteo 2021)")
+st.title("⚡ Price Area Dashboard (Real Elhub + Open-Meteo ERA5)")
 
-DATA_PATH = "data/open-meteo-subset.csv"
-
-# ------------- Helper: Load or auto-generate ERA5 demo data -------------
-@st.cache_data
+# ------------- Load REAL ERA5 data from Open-Meteo API -------------
+@st.cache_data(ttl=3600)
 def load_era5_data():
-    if os.path.exists(DATA_PATH):
-        df = pd.read_csv(DATA_PATH, parse_dates=["time"])
-        st.info("✅ Using cached ERA5 data from local file.")
-    else:
-        st.warning("No cached ERA5 file found. Creating demo dataset...")
-        # --- Demo fallback: create hourly data for Bergen 2021
-        date_rng = pd.date_range("2021-01-01", "2021-12-31 23:00", freq="H")
-        np.random.seed(0)
-        temp = 5 + 10 * np.sin(2 * np.pi * date_rng.dayofyear / 365) + np.random.normal(0, 2, len(date_rng))
-        df = pd.DataFrame({
-            "time": date_rng,
-            "temperature_2m": temp,
-            "city": "Bergen",
-            "era5_year": 2021
-        })
-        os.makedirs("data", exist_ok=True)
-        df.to_csv(DATA_PATH, index=False)
-        st.success("✅ ERA5 dataset created and cached at data/open-meteo-subset.csv")
-    return df
+    """
+    Fetch REAL ERA5 weather data from Open-Meteo API for Bergen, Norway (2021).
+    No demo data - this is actual historical weather reanalysis.
+    """
+    try:
+        with st.spinner("Fetching real ERA5 weather data from Open-Meteo API..."):
+            # Bergen coordinates
+            df = fetch_era5(lat=60.39, lon=5.32, year=2021)
+            df['city'] = 'Bergen'
+            df['era5_year'] = 2021
+        st.success("✅ Real ERA5 data loaded from Open-Meteo API")
+        return df
+    except Exception as e:
+        st.error(f"Failed to fetch ERA5 data: {e}")
+        st.info("Using fallback: empty dataset")
+        return pd.DataFrame()
 
-# load automatically
+# Load real weather data
 era5_df = load_era5_data()
 
 # ------------- Real Elhub data from MongoDB (NO FAKE DATA!) -------------

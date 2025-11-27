@@ -1,5 +1,6 @@
 # pages/06_Analysis_B.py
-import os
+import sys
+sys.path.append('..')
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -7,73 +8,41 @@ import plotly.express as px
 from sklearn.neighbors import LocalOutlierFactor
 from scipy.fftpack import dct, idct
 from pandas.api.types import is_datetime64_any_dtype
+from lib.open_meteo import fetch_era5
 
-st.set_page_config(page_title="Analysis B — SPC & LOF (Open-Meteo 2021)", page_icon="⚡", layout="wide")
-st.title("⚡ Analysis B — SPC & LOF (Open-Meteo 2021)")
+st.set_page_config(page_title="Analysis B — SPC & LOF (Real ERA5)", page_icon="⚡", layout="wide")
+st.title("⚡ Analysis B — SPC & LOF Outlier Detection (Real ERA5 Data)")
 
-DATA_PATH = "data/open-meteo-subset.csv"
-
-# ---------- Data loader with auto-fallback ----------
-@st.cache_data
-def load_or_build_era5():
+# ---------- Load REAL ERA5 data from Open-Meteo API ----------
+@st.cache_data(ttl=3600)
+def load_real_era5():
     """
-    Returns a DataFrame with columns:
-      time (datetime64[ns]), temperature_2m (float), precipitation (float), era5_year (int), city (str)
-    If the CSV isn't present, a small 2021 dataset is created and saved.
+    Fetch REAL ERA5 weather data from Open-Meteo API for Bergen, Norway (2021).
+    Returns DataFrame with: time, temperature_2m, precipitation, and other weather variables.
     """
-    if os.path.exists(DATA_PATH):
-        df = pd.read_csv(DATA_PATH)
-        # Robust time parsing (works with strings or already-datetimes, UTC or naive)
-        if "time" in df.columns:
-            df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
-            # drop tz info to keep numpy/plotly happy
-            try:
-                df["time"] = df["time"].dt.tz_convert(None)
-            except Exception:
-                try:
-                    df["time"] = df["time"].dt.tz_localize(None)
-                except Exception:
-                    pass
-            df = df.dropna(subset=["time"])
-        else:
-            # build an index if somehow missing
-            df["time"] = pd.date_range("2021-01-01", periods=len(df), freq="H")
+    try:
+        with st.spinner("Fetching real ERA5 weather data from Open-Meteo API..."):
+            # Bergen, Norway coordinates
+            df = fetch_era5(lat=60.39, lon=5.32, year=2021,
+                          hourly_vars=["temperature_2m", "precipitation", "relative_humidity_2m", "wind_speed_10m"])
+            df['era5_year'] = 2021
+            df['city'] = 'Bergen'
 
-        # Ensure precipitation exists
-        if "precipitation" not in df.columns:
-            rng = np.random.default_rng(42)
-            base = np.clip(rng.normal(0.3, 0.2, len(df)), 0, None)
-            spikes_idx = rng.choice(len(df), size=int(len(df) * 0.01), replace=False)
-            base[spikes_idx] += rng.uniform(3, 10, len(spikes_idx))
-            df["precipitation"] = base
+            # Remove timezone for compatibility with numpy/plotly
+            df['time'] = df['time'].dt.tz_localize(None)
 
-        st.info("✅ ERA5 data loaded from cache (data/open-meteo-subset.csv).")
+        st.success("✅ Real ERA5 data loaded from Open-Meteo API (8,760 hourly records)")
         return df
+    except Exception as e:
+        st.error(f"Failed to fetch ERA5 data from API: {e}")
+        st.warning("Please check your internet connection and try again.")
+        return pd.DataFrame()
 
-    # --- Fallback: build a synthetic but realistic 2021 series (hourly) for Bergen ---
-    st.warning("No cached ERA5 file found. Building a small 2021 demo dataset now…")
-    time = pd.date_range("2021-01-01", "2021-12-31 23:00", freq="H")
-    n = len(time)
-    rng = np.random.default_rng(0)
+df = load_real_era5()
 
-    temp = 5 + 10 * np.sin(2 * np.pi * (time.dayofyear.values / 365.0)) + rng.normal(0, 2, n)
-    precip = np.clip(rng.normal(0.3, 0.2, n), 0, None)
-    spikes_idx = rng.choice(n, size=int(n * 0.01), replace=False)
-    precip[spikes_idx] += rng.uniform(3, 10, len(spikes_idx))
-
-    df = pd.DataFrame({
-        "time": time,
-        "temperature_2m": temp,
-        "precipitation": precip,
-        "era5_year": 2021,
-        "city": "Bergen"
-    })
-    os.makedirs("data", exist_ok=True)
-    df.to_csv(DATA_PATH, index=False)
-    st.success("✅ Demo ERA5 dataset created and cached at data/open-meteo-subset.csv")
-    return df
-
-df = load_or_build_era5()
+if df.empty:
+    st.error("No data available. Cannot proceed with analysis.")
+    st.stop()
 
 # Safety: ensure datetime (naive)
 if not is_datetime64_any_dtype(df["time"]):

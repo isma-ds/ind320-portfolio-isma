@@ -1,0 +1,266 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "omrade": "NO1",
+        "name": "Oslo/\u00d8st-Norge",
+        "description": "Price area NO1 - Eastern Norway"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              10.0,
+              58.5
+            ],
+            [
+              12.5,
+              58.5
+            ],
+            [
+              13.0,
+              59.5
+            ],
+            [
+              12.5,
+              61.0
+            ],
+            [
+              11.5,
+              62.0
+            ],
+            [
+              10.0,
+              62.0
+            ],
+            [
+              9.5,
+              61.0
+            ],
+            [
+              9.5,
+              59.0
+            ],
+            [
+              10.0,
+              58.5
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "omrade": "NO2",
+        "name": "Kristiansand/S\u00f8r-Norge",
+        "description": "Price area NO2 - Southern Norway"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              6.0,
+              58.0
+            ],
+            [
+              9.5,
+              58.0
+            ],
+            [
+              10.0,
+              58.5
+            ],
+            [
+              9.5,
+              59.0
+            ],
+            [
+              8.0,
+              59.5
+            ],
+            [
+              6.5,
+              59.5
+            ],
+            [
+              5.5,
+              59.0
+            ],
+            [
+              6.0,
+              58.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "omrade": "NO3",
+        "name": "Trondheim/Midt-Norge",
+        "description": "Price area NO3 - Central Norway"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.0,
+              62.0
+            ],
+            [
+              12.0,
+              62.0
+            ],
+            [
+              14.0,
+              63.0
+            ],
+            [
+              15.0,
+              64.5
+            ],
+            [
+              13.0,
+              65.5
+            ],
+            [
+              10.0,
+              65.0
+            ],
+            [
+              7.0,
+              64.0
+            ],
+            [
+              6.5,
+              62.5
+            ],
+            [
+              8.0,
+              62.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "omrade": "NO4",
+        "name": "Troms\u00f8/Nord-Norge",
+        "description": "Price area NO4 - Northern Norway"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              15.0,
+              68.0
+            ],
+            [
+              20.0,
+              68.5
+            ],
+            [
+              25.0,
+              69.0
+            ],
+            [
+              29.0,
+              69.5
+            ],
+            [
+              29.5,
+              70.5
+            ],
+            [
+              28.0,
+              71.0
+            ],
+            [
+              25.0,
+              70.5
+            ],
+            [
+              20.0,
+              70.0
+            ],
+            [
+              16.0,
+              69.5
+            ],
+            [
+              15.0,
+              68.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "omrade": "NO5",
+        "name": "Bergen/Vest-Norge",
+        "description": "Price area NO5 - Western Norway"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              4.5,
+              59.0
+            ],
+            [
+              6.5,
+              59.0
+            ],
+            [
+              7.5,
+              59.5
+            ],
+            [
+              8.0,
+              61.0
+            ],
+            [
+              7.0,
+              62.0
+            ],
+            [
+              6.5,
+              62.5
+            ],
+            [
+              5.5,
+              62.5
+            ],
+            [
+              4.5,
+              61.5
+            ],
+            [
+              4.5,
+              59.0
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
